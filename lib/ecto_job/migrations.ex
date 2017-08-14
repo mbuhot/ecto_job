@@ -1,7 +1,15 @@
 defmodule EctoJob.Migrations do
   defmodule Install do
+    @moduledoc """
+    Defines migrations for installing shared functions
+    """
+
     import Ecto.Migration
 
+    @doc """
+    Creates the `fn_notify_inserted` trigger function.
+    This function will be called from triggers attached to job queue tables.
+    """
     def up do
       execute """
         CREATE FUNCTION fn_notify_inserted()
@@ -15,16 +23,22 @@ defmodule EctoJob.Migrations do
         """
     end
 
+    @doc """
+    Drops the `fn_notify_inserted` trigger function
+    """
     def down do
       execute "DROP FUNCTION fn_notify_inserted()"
     end
   end
 
   defmodule CreateJobTable do
+    @moduledoc """
+    Adds a job queue table with the given name, and attaches an insert trigger.
+    """
     import Ecto.Migration
 
     def up(name) do
-      create table(name) do
+      _ = create table(name) do
         add :state, :string, null: false, default: "AVAILABLE"
         add :expires, :utc_datetime
         add :schedule, :utc_datetime, null: false, default: fragment("timezone('UTC', now())")
@@ -43,6 +57,9 @@ defmodule EctoJob.Migrations do
         """
     end
 
+    @doc """
+    Drops the job queue table with the given name, and associated trigger
+    """
     def down(name) do
       execute "DROP FUNCTION tr_notify_inserted_#{name}()"
       execute "DROP TABLE #{name}"

@@ -8,7 +8,13 @@ defmodule EctoJob.Mixfile do
       elixir: "~> 1.4",
       elixirc_paths: elixirc_paths(Mix.env),
       start_permanent: Mix.env == :prod,
-      deps: deps()
+      deps: deps(),
+      dialyzer: [
+        plt_add_apps: [:mix],
+        plt_add_deps: :apps_direct,
+        flags: ["-Werror_handling", "-Wno_unused", "-Wunmatched_returns", "-Wunderspecs"],
+        remove_defaults: [:unknown]
+      ]
     ]
   end
 
@@ -21,9 +27,10 @@ defmodule EctoJob.Mixfile do
 
   defp deps do
     [
-      {:ecto, "~> 2.2-rc", override: true},
+      {:ecto, "~> 2.2-rc"},
       {:postgrex, ">= 0.0.0"},
-      {:gen_stage, ">= 0.0.0"}
+      {:gen_stage, ">= 0.0.0"},
+      {:dialyxir, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end

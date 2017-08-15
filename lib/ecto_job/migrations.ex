@@ -1,4 +1,6 @@
 defmodule EctoJob.Migrations do
+  @moduledoc false
+
   defmodule Install do
     @moduledoc """
     Defines migrations for installing shared functions

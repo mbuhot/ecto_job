@@ -45,7 +45,8 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
 end
 ```
 
-Add a module for the queue. This will declare an `Ecto.Schema` to use with the table created in the migration.
+Add a module for the queue. This will declare an `Ecto.Schema` to use with the table created in the migration and a
+start_link function allowing the supervisor to be started conveniently.
 
 ```elixir
 defmodule MyApp.JobQueue do
@@ -53,7 +54,7 @@ defmodule MyApp.JobQueue do
 end
 ```
 
-Add `EctoJob.Supervisor` to the application supervision tree to process jobs:
+Add your new JobQueue module as a supervisor to the application supervision tree:
 
 ```elixir
 def start(_type, _args) do
@@ -61,12 +62,7 @@ def start(_type, _args) do
 
   children = [
     supervisor(MyApp.Repo, []),
-    supervisor(EctoJob.Supervisor, [[
-      app: :my_app,            # Needed to retrieve the Repo configuration
-      name: MyAppJobQueue,     # Name of this supervisor
-      repo: MyApp.Repo,        # Repo for accessing the DB
-      schema: MyApp.JobQueue,  # Schema for Job Queue table
-      max_demand: 100]])       # Maximum concurrency
+    supervisor(MyApp.JobQueue, [[repo: MyApp.Repo, max_demand: 100]])
   ]
 
   opts = [strategy: :one_for_one, name: MyApp.Supervisor]

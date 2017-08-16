@@ -106,7 +106,7 @@ defmodule EctoJob.Producer do
   @spec dispatch_jobs(State.t) :: {:noreply, [JobQueue.job], State.t}
   defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}) do
     {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, DateTime.utc_now())
-    Logger.debug("Reserved #{count} jobs")
+    _ = Logger.debug("Reserved #{count} jobs")
     {:noreply, jobs, %{state | demand: demand - count}}
   end
 end

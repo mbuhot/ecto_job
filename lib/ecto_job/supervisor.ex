@@ -32,22 +32,22 @@ defmodule EctoJob.Supervisor do
   @doc """
   Starts an EctoJob queue supervisor
 
-   - `name`       : The name used to register this supervisor
    - `app`        : The otp application containing the repo configuration
    - `repo`       : Ecto Repo module
    - `schema`     : EctoJob.JobQueue Module for the schema representing the queue
    - `max_demand` : Sets the maximum concurrency for job workers
   """
-  @spec start_link([name: atom, app: atom, repo: module, schema: module, max_demand: integer]) :: {:ok, pid}
-  def start_link(name: name, app: app, repo: repo, schema: schema, max_demand: max_demand) do
+  @spec start_link([app: atom, repo: module, schema: module, max_demand: integer]) :: {:ok, pid}
+  def start_link(app: app, repo: repo, schema: schema, max_demand: max_demand) do
     repo_config = Application.get_env(app, repo)
-    notifier_name = String.to_atom("#{name}Notifier")
-    producer_name = String.to_atom("#{name}Producer")
+    supervisor_name = String.to_atom("#{schema}.Supervisor")
+    notifier_name = String.to_atom("#{schema}.Notifier")
+    producer_name = String.to_atom("#{schema}.Producer")
     children = [
       worker(Postgrex.Notifications, [repo_config ++ [name: notifier_name]]),
       worker(Producer, [[name: producer_name, repo: repo, schema: schema, notifier: notifier_name]]),
       supervisor(WorkerSupervisor, [[repo: repo, subscribe_to: [{producer_name, max_demand: max_demand}]]])
     ]
-    Supervisor.start_link(children, strategy: :rest_for_one, name: name)
+    Supervisor.start_link(children, strategy: :one_for_one, name: supervisor_name)
   end
 end

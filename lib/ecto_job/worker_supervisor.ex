@@ -6,7 +6,6 @@ defmodule EctoJob.WorkerSupervisor do
   import Supervisor.Spec
   alias EctoJob.Worker
 
-  @dialyzer {:no_return, [start_link: 1]} # something is wrong with typespecs in ConsumerSupervisor
 
   @doc """
   Starts the ConsumerSupervisor

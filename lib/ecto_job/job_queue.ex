@@ -41,6 +41,21 @@ defmodule EctoJob.JobQueue do
         timestamps()
       end
 
+      @doc """
+      Start the JobQueue.Supervisor using the current module as the queue schema.
+      """
+      @spec start_link([repo: EctoJob.JobQueue.repo, max_demand: integer]) :: {:ok, pid}
+      def start_link(repo: repo, max_demand: max_demand) do
+        EctoJob.Supervisor.start_link(repo: repo, schema: __MODULE__, max_demand: max_demand)
+      end
+
+      @doc """
+      Create a new #{__MODULE__} instance given {mod, func, args} tuple or closure callback.
+
+      Options:
+
+       - `:schedule` : runs the job at the given `%DateTime{}`
+      """
       @type work :: {module, atom, list} | (Ecto.Multi.t -> term)
       @spec new(work, Keyword.t) :: EctoJob.JobQueue.job
       def new(work, opts \\ [])
@@ -59,6 +74,17 @@ defmodule EctoJob.JobQueue do
         new({EctoJob.JobQueue, :perform, [func]})
       end
 
+      @doc """
+      Adds a job to an Ecto.Multi given {mod, func, args} tuple or closure callback.
+      This is the preferred method of enqueueing jobs along side other application updates.
+
+      ## Example:
+
+          Ecto.Multi.new()
+          |> Ecto.Multi.insert(create_new_user_changeset(user_params))
+          |> MyApp.Job.enqueue("send_welcome_email", &SendWelcomeEmail.perform(&1, user_params))
+          |> MyApp.Repo.transaction()
+      """
       @spec enqueue(Ecto.Multi.t, term, work, Keyword.t) :: Ecto.Multi.t
       def enqueue(multi = %Ecto.Multi{}, name,  work, opts \\ []) do
         Ecto.Multi.insert(multi, name, new(work, opts))

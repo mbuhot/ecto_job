@@ -1,0 +1,21 @@
+language: elixir
+
+elixir:
+  - 1.5.1
+  
+otp_release:
+  - 20.0
+
+addons:
+  postgresql: "9.6"
+
+cache:
+  directories:
+    - deps
+
+script:
+- mix local.rebar --force
+- mix local.hex --force
+- mix deps.get
+- MIX_ENV=test mix do ecto.create, ecto.migrate
+- mix test

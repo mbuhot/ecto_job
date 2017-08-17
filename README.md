@@ -1,3 +1,5 @@
+![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg)](http://inch-ci.org/github/mbuhot/ecto_job)
+
 # EctoJob
 
 A transactional job queue built with Ecto, PostgreSQL and GenStage

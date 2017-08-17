@@ -19,6 +19,7 @@ defmodule EctoJob.JobQueue do
     expires: DateTime.t | nil,
     schedule: DateTime.t,
     attempt: integer,
+    max_attempts: integer,
     module: String.t,
     function: String.t,
     arguments: binary,
@@ -35,6 +36,7 @@ defmodule EctoJob.JobQueue do
         field :expires, :utc_datetime  # Time at which reserved/in_progress jobs can be reset to SCHEDULED
         field :schedule, :utc_datetime # Time at which a scheduled job can be reserved
         field :attempt, :integer       # Counter for number of attempts for this job
+        field :max_attempts, :integer  # Maximum attempts before this job is FAILED
         field :module, :string         # Module of client code to invoke
         field :function, :string       # Function of client code to invoke
         field :arguments, :binary      # List of function arguments, serialized with `term_to_binary`
@@ -55,6 +57,7 @@ defmodule EctoJob.JobQueue do
       Options:
 
        - `:schedule` : runs the job at the given `%DateTime{}`
+       - `:max_attempts` : the maximum attempts for this job
       """
       @type work :: {module, atom, list} | (Ecto.Multi.t -> term)
       @spec new(work, Keyword.t) :: EctoJob.JobQueue.job
@@ -65,6 +68,7 @@ defmodule EctoJob.JobQueue do
           expires: nil,
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
           attempt: 0,
+          max_attempts: opts[:max_attempts],
           module: to_string(mod),
           function: to_string(func),
           arguments: :erlang.term_to_binary(args)
@@ -124,8 +128,25 @@ defmodule EctoJob.JobQueue do
     {count, _} = repo.update_all(
       Query.from(job in schema,
       where: job.state in ["RESERVED", "IN_PROGRESS"],
+      where: job.attempt < job.max_attempts,
       where: job.expires < ^now),
       [set: [state: "AVAILABLE", expires: nil]])
+
+    count
+  end
+
+  @doc """
+  Updates all jobs that have been attempted the maximum number of times to FAILED.
+  Returns the number of jobs updated.
+  """
+  @spec fail_expired_jobs_at_max_attempts(repo, schema, DateTime.t) :: integer
+  def fail_expired_jobs_at_max_attempts(repo, schema, DateTime.t) do
+    {count, _} = repo.update_all(
+      Query.from(job in schema,
+      where: job.state in ["IN_PROGRESS"],
+      where: job.attempt >= job.max_attempts,
+      where: job.expires < ^now),
+      [set: [state: "FAILED", expires: nil]])
 
     count
   end

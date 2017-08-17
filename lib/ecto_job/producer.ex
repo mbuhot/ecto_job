@@ -76,7 +76,9 @@ defmodule EctoJob.Producer do
     {:noreply, [], state}
   end
   def handle_info(:poll, state = %State{repo: repo, schema: schema}) do
-    if activate_jobs(repo, schema, DateTime.utc_now()) > 0 do
+    now = DateTime.utc_now()
+    _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
+    if activate_jobs(repo, schema, now) > 0 do
       dispatch_jobs(state)
     else
       {:noreply, [], state}

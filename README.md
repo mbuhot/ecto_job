@@ -143,4 +143,5 @@ If unsuccessful, the job remains in the "IN_PROGRESS" state until it expires.
 
 Jobs in the "RESERVED" or "IN_PROGRESS" state past the expiry time will be returned to the "AVAILABLE" state.
 
-TODO: Expired jobs in the "IN_PROGRESS" state with attempts > MAX_ATTEMPTS should move to a "FAILED" state.
+Expired jobs in the "IN_PROGRESS" state with attempts >= MAX_ATTEMPTS move to a "FAILED" state.
+Failed jobs are kept in the database so that application developers can handle the failure.

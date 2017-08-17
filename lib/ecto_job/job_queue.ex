@@ -75,7 +75,7 @@ defmodule EctoJob.JobQueue do
         }
       end
       def new(func, opts) when is_function(func) do
-        new({EctoJob.JobQueue, :perform, [func]})
+        new({EctoJob.JobQueue, :perform, [func]}, opts)
       end
 
       @doc """
@@ -111,7 +111,7 @@ defmodule EctoJob.JobQueue do
   @spec activate_scheduled_jobs(repo, schema, DateTime.t) :: integer
   def activate_scheduled_jobs(repo, schema, now = %DateTime{}) do
     {count, _} = repo.update_all(
-      Query.from(job in schema,
+      (Query.from job in schema,
       where: job.state == "SCHEDULED",
       where: job.schedule <= ^now),
       [set: [state: "AVAILABLE"]])
@@ -126,7 +126,7 @@ defmodule EctoJob.JobQueue do
   @spec activate_expired_jobs(repo, schema, DateTime.t) :: integer
   def activate_expired_jobs(repo, schema, now = %DateTime{}) do
     {count, _} = repo.update_all(
-      Query.from(job in schema,
+      (Query.from job in schema,
       where: job.state in ["RESERVED", "IN_PROGRESS"],
       where: job.attempt < job.max_attempts,
       where: job.expires < ^now),
@@ -140,9 +140,9 @@ defmodule EctoJob.JobQueue do
   Returns the number of jobs updated.
   """
   @spec fail_expired_jobs_at_max_attempts(repo, schema, DateTime.t) :: integer
-  def fail_expired_jobs_at_max_attempts(repo, schema, DateTime.t) do
+  def fail_expired_jobs_at_max_attempts(repo, schema, now = %DateTime{}) do
     {count, _} = repo.update_all(
-      Query.from(job in schema,
+      (Query.from job in schema,
       where: job.state in ["IN_PROGRESS"],
       where: job.attempt >= job.max_attempts,
       where: job.expires < ^now),
@@ -171,12 +171,12 @@ defmodule EctoJob.JobQueue do
   @spec available_jobs(schema, integer) :: Ecto.Query.t
   def available_jobs(schema, demand) do
     query =
-      Query.from(job in schema,
+      Query.from job in schema,
       where: job.state == "AVAILABLE",
       order_by: [asc: job.schedule],
       lock: "FOR UPDATE SKIP LOCKED",
       limit: ^demand,
-      select: [:id])
+      select: [:id]
 
     # Ecto doesn't support subquery in where clause, so use join as workaround
     Query.from job in schema,
@@ -208,16 +208,16 @@ defmodule EctoJob.JobQueue do
 
   Returns {:ok, job} when sucessful, {:error, :expired} otherwise.
   """
-  @spec update_job_in_progress(repo, struct, DateTime.t) :: {:ok, job} | {:error, :expired}
+  @spec update_job_in_progress(repo, job, DateTime.t) :: {:ok, job} | {:error, :expired}
   def update_job_in_progress(repo, job = %schema{}, now) do
     {count, results} =
       repo.update_all(
-        Query.from(j in schema,
+        (Query.from j in schema,
         where: j.id == ^(job.id),
         where: j.attempt == (^job.attempt),
         where: j.state == "RESERVED",
         where: j.expires >= ^now),
-        [set: [attempt: job.attempt + 1, state: "IN_PROGRESS", expires: progress_expiry(now, job.attempt)]],
+        [set: [attempt: job.attempt + 1, state: "IN_PROGRESS", expires: progress_expiry(now, job.attempt + 1)]],
         [returning: true])
 
     case {count, results} do

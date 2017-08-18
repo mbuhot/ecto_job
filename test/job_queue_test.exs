@@ -1,14 +1,10 @@
 defmodule EctoJob.JobQueueTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias EctoJob.Test.Repo
   require Ecto.Query, as: Query
 
-  setup tags do
+  setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
-    unless tags[:async] do
-      Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
-    end
-    :ok
   end
 
   describe "JobQueue __using__ macro" do

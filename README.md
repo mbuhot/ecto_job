@@ -1,4 +1,5 @@
-![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg)](http://inch-ci.org/github/mbuhot/ecto_job)
+[![Build Status](https://travis-ci.org/mbuhot/ecto_job.svg?branch=master)](https://travis-ci.org/mbuhot/ecto_job)
+[![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg?branch=master&style=flat)](http://inch-ci.org/github/mbuhot/ecto_job)
 
 # EctoJob
 

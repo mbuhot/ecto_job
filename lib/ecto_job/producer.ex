@@ -13,6 +13,7 @@ defmodule EctoJob.Producer do
 
   use GenStage
   alias EctoJob.JobQueue
+  alias Postgrex.Notifications
   require Logger
 
   @type repo :: module
@@ -34,8 +35,6 @@ defmodule EctoJob.Producer do
       clock: (() -> DateTime.t)
     }
   end
-
-
 
   @doc """
   Starts the producer GenStage process.
@@ -71,7 +70,7 @@ defmodule EctoJob.Producer do
 
   # Starts the sweeper timer to activate scheduled/expired jobs
   @spec start_timer() :: {:ok, :timer.tref}
-  defp start_timer() do
+  defp start_timer do
     {:ok, _ref} = :timer.send_interval(60_000, :poll)
   end
 
@@ -79,7 +78,7 @@ defmodule EctoJob.Producer do
   @spec start_listener(notifier, schema) :: reference
   defp start_listener(notifier, schema) do
     table_name = schema.__schema__(:source)
-    Postgrex.Notifications.listen!(notifier, table_name)
+    Notifications.listen!(notifier, table_name)
   end
 
   @doc """
@@ -127,7 +126,6 @@ defmodule EctoJob.Producer do
   @spec dispatch_jobs(State.t, DateTime.t) :: {:noreply, [JobQueue.job], State.t}
   defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}, now) do
     {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now)
-    _ = Logger.debug("Reserved #{count} jobs")
     {:noreply, jobs, %{state | demand: demand - count}}
   end
 end

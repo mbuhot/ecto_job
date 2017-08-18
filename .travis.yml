@@ -23,6 +23,7 @@ before_script:
 
 script:
   - mix test
+  - mix credo
 
 after_script:
   - mix inch.report

@@ -6,7 +6,6 @@ defmodule EctoJob.WorkerSupervisor do
   import Supervisor.Spec
   alias EctoJob.Worker
 
-
   @doc """
   Starts the ConsumerSupervisor
 

@@ -7,6 +7,7 @@ defmodule EctoJob.JobQueue do
       use EctoJob.JobQueue table_name: "jobs"
   """
 
+  alias Ecto.{Changeset, Multi}
   require Ecto.Query, as: Query
 
   @type repo :: module
@@ -59,7 +60,7 @@ defmodule EctoJob.JobQueue do
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
       """
-      @type work :: {module, atom, list} | (Ecto.Multi.t -> term)
+      @type work :: {module, atom, list} | (Multi.t -> term)
       @spec new(work, Keyword.t) :: EctoJob.JobQueue.job
       def new(work, opts \\ [])
       def new({mod, func, args}, opts) when is_list(args) do
@@ -89,9 +90,9 @@ defmodule EctoJob.JobQueue do
           |> MyApp.Job.enqueue("send_welcome_email", &SendWelcomeEmail.perform(&1, user_params))
           |> MyApp.Repo.transaction()
       """
-      @spec enqueue(Ecto.Multi.t, term, work, Keyword.t) :: Ecto.Multi.t
-      def enqueue(multi = %Ecto.Multi{}, name,  work, opts \\ []) do
-        Ecto.Multi.insert(multi, name, new(work, opts))
+      @spec enqueue(Multi.t, term, work, Keyword.t) :: Multi.t
+      def enqueue(multi = %Multi{}, name,  work, opts \\ []) do
+        Multi.insert(multi, name, new(work, opts))
       end
     end
   end
@@ -99,7 +100,7 @@ defmodule EctoJob.JobQueue do
   @doc """
   Named function to use when a job is enqueued with an anonymous function.
   """
-  @spec perform(Ecto.Multi.t, (Ecto.Multi.t -> term)) :: term
+  @spec perform(Multi.t, (Multi.t -> term)) :: term
   def perform(multi, func) do
     func.(multi)
   end
@@ -255,20 +256,20 @@ defmodule EctoJob.JobQueue do
   Creates an Ecto.Multi struct with the command to delete the given job from the queue.
   This will be passed as the first argument to the user supplied callback function.
   """
-  @spec initial_multi(job) :: Ecto.Multi.t
+  @spec initial_multi(job) :: Multi.t
   def initial_multi(job) do
-    Ecto.Multi.new()
-    |> Ecto.Multi.delete("delete_job_#{job.id}", delete_job_changeset(job))
+    Multi.new()
+    |> Multi.delete("delete_job_#{job.id}", delete_job_changeset(job))
   end
 
   @doc """
   Creates a changeset that will delete a job, confirming that the attempt counter hasn't been
   increased by another worker process.
   """
-  @spec delete_job_changeset(job) :: Ecto.Changeset.t
+  @spec delete_job_changeset(job) :: Changeset.t
   def delete_job_changeset(job) do
     job
-    |> Ecto.Changeset.change()
-    |> Ecto.Changeset.optimistic_lock(:attempt)
+    |> Changeset.change()
+    |> Changeset.optimistic_lock(:attempt)
   end
 end

@@ -37,6 +37,7 @@ defmodule EctoJob.Mixfile do
       {:ecto, "~> 2.2-rc"},
       {:postgrex, ">= 0.0.0"},
       {:gen_stage, ">= 0.0.0"},
+      {:credo, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.12", only: :dev, runtime: false},
       {:inch_ex, ">= 0.4.0", only: :dev, runtime: false}

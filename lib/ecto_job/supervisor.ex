@@ -46,6 +46,6 @@ defmodule EctoJob.Supervisor do
       worker(Producer, [[name: producer_name, repo: repo, schema: schema, notifier: notifier_name]]),
       supervisor(WorkerSupervisor, [[repo: repo, subscribe_to: [{producer_name, max_demand: max_demand}]]])
     ]
-    Supervisor.start_link(children, strategy: :one_for_one, name: supervisor_name)
+    Supervisor.start_link(children, strategy: :rest_for_one, name: supervisor_name)
   end
 end

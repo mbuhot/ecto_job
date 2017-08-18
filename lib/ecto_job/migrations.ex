@@ -34,11 +34,16 @@ defmodule EctoJob.Migrations do
   end
 
   defmodule CreateJobTable do
+    @doc """
+    Defines a migration to create a table to be used as a job queue.
+    This migration can be run multiple times with different values to create multiple queues.
+    """
+
+    import Ecto.Migration
+
     @moduledoc """
     Adds a job queue table with the given name, and attaches an insert trigger.
     """
-    import Ecto.Migration
-
     def up(name) do
       _ = create table(name) do
         add :state, :string, null: false, default: "AVAILABLE"

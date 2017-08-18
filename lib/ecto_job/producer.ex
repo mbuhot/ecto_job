@@ -1,4 +1,16 @@
 defmodule EctoJob.Producer do
+  @moduledoc """
+  GenStage producer responsible for reserving available jobs from a job queue, and
+  passing them on to the consumer module.
+
+  The GenStage will buffer demand when there are insufficient jobs available in the
+  database.
+
+  Installs a timer to check for expired jobs, and uses a Postgrex.Notifications listener
+  to dispatch jobs immediately when new jobs are inserted into the database and there is
+  pending demand.
+  """
+
   use GenStage
   alias EctoJob.JobQueue
   require Logger

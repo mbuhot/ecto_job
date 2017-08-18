@@ -23,14 +23,15 @@ defmodule EctoJob.Producer do
     @moduledoc """
     Internal state of the Producer GenStage
     """
-    @enforce_keys [:repo, :schema, :notifier, :demand]
-    defstruct [:repo, :schema, :notifier, :demand]
+    @enforce_keys [:repo, :schema, :notifier, :demand, :clock]
+    defstruct [:repo, :schema, :notifier, :demand, :clock]
 
     @type t :: %__MODULE__{
       repo: EctoJob.Producer.repo,
       schema: EctoJob.Producer.schema,
       notifier: EctoJob.Producer.notifier,
-      demand: integer
+      demand: integer,
+      clock: (() -> DateTime.t)
     }
   end
 
@@ -47,7 +48,13 @@ defmodule EctoJob.Producer do
   def start_link(name: name, repo: repo, schema: schema, notifier: notifier) do
     GenStage.start_link(
       __MODULE__,
-      %State{repo: repo, schema: schema, notifier: Process.whereis(notifier), demand: 0},
+      %State{
+        repo: repo,
+        schema: schema,
+        notifier: Process.whereis(notifier),
+        demand: 0,
+        clock: &DateTime.utc_now/0
+      },
       name: name)
   end
 
@@ -87,17 +94,17 @@ defmodule EctoJob.Producer do
   def handle_info(_, state = %State{demand: 0}) do
     {:noreply, [], state}
   end
-  def handle_info(:poll, state = %State{repo: repo, schema: schema}) do
-    now = DateTime.utc_now()
+  def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
+    now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
     if activate_jobs(repo, schema, now) > 0 do
-      dispatch_jobs(state)
+      dispatch_jobs(state, now)
     else
       {:noreply, [], state}
     end
   end
-  def handle_info({:notification, _pid, _ref, _channel, _payload}, state = %State{}) do
-    dispatch_jobs(state)
+  def handle_info({:notification, _pid, _ref, _channel, _payload}, state = %State{clock: clock}) do
+    dispatch_jobs(state, clock.())
   end
 
   @doc """
@@ -105,8 +112,8 @@ defmodule EctoJob.Producer do
   """
   @impl true
   @spec handle_demand(integer, State.t) :: {:noreply, [JobQueue.job], State.t}
-  def handle_demand(demand, state = %State{demand: buffered_demand}) do
-    dispatch_jobs(%{state | demand: demand + buffered_demand})
+  def handle_demand(demand, state = %State{demand: buffered_demand, clock: clock}) do
+    dispatch_jobs(%{state | demand: demand + buffered_demand}, clock.())
   end
 
   # Acivate sheduled jobs and expired jobs, returning the number of jobs activated
@@ -117,9 +124,9 @@ defmodule EctoJob.Producer do
   end
 
   # Reserve jobs according to demand, and construct the GenState reply tuple
-  @spec dispatch_jobs(State.t) :: {:noreply, [JobQueue.job], State.t}
-  defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}) do
-    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, DateTime.utc_now())
+  @spec dispatch_jobs(State.t, DateTime.t) :: {:noreply, [JobQueue.job], State.t}
+  defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}, now) do
+    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now)
     _ = Logger.debug("Reserved #{count} jobs")
     {:noreply, jobs, %{state | demand: demand - count}}
   end

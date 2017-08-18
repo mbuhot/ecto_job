@@ -3,8 +3,6 @@ defmodule EctoJob.WorkerTest do
   alias EctoJob.Test.{JobQueue, Repo}
   alias Ecto.{Changeset, Multi}
 
-
-
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
   end

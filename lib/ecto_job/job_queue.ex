@@ -45,6 +45,19 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
+      Supervisor child_spec for use with Elixir 1.5+
+      See `start_link` for available options
+      """
+      @spec child_spec(Keyword.t) :: Supervisor.child_spec
+      def child_spec(opts) do
+        %{
+          id: __MODULE__,
+          start: {__MODULE__, :start_link, [opts]},
+          type: :supervisor
+        }
+      end
+
+      @doc """
       Start the JobQueue.Supervisor using the current module as the queue schema.
       """
       @spec start_link([repo: EctoJob.JobQueue.repo, max_demand: integer]) :: {:ok, pid}
@@ -115,7 +128,7 @@ defmodule EctoJob.JobQueue do
       (Query.from job in schema,
       where: job.state == "SCHEDULED",
       where: job.schedule <= ^now),
-      [set: [state: "AVAILABLE"]])
+      [set: [state: "AVAILABLE", updated_at: now]])
 
     count
   end
@@ -131,7 +144,7 @@ defmodule EctoJob.JobQueue do
       where: job.state in ["RESERVED", "IN_PROGRESS"],
       where: job.attempt < job.max_attempts,
       where: job.expires < ^now),
-      [set: [state: "AVAILABLE", expires: nil]])
+      [set: [state: "AVAILABLE", expires: nil, updated_at: now]])
 
     count
   end
@@ -147,7 +160,7 @@ defmodule EctoJob.JobQueue do
       where: job.state in ["IN_PROGRESS"],
       where: job.attempt >= job.max_attempts,
       where: job.expires < ^now),
-      [set: [state: "FAILED", expires: nil]])
+      [set: [state: "FAILED", expires: nil, updated_at: now]])
 
     count
   end
@@ -161,7 +174,7 @@ defmodule EctoJob.JobQueue do
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}) do
     repo.update_all(
       available_jobs(schema, demand),
-      [set: [state: "RESERVED", expires: reservation_expiry(now)]],
+      [set: [state: "RESERVED", expires: reservation_expiry(now), updated_at: now]],
       returning: true)
   end
 
@@ -218,7 +231,10 @@ defmodule EctoJob.JobQueue do
         where: j.attempt == (^job.attempt),
         where: j.state == "RESERVED",
         where: j.expires >= ^now),
-        [set: [attempt: job.attempt + 1, state: "IN_PROGRESS", expires: progress_expiry(now, job.attempt + 1)]],
+        [set: [attempt: job.attempt + 1,
+               state: "IN_PROGRESS",
+               expires: progress_expiry(now, job.attempt + 1),
+               updated_at: now]],
         [returning: true])
 
     case {count, results} do

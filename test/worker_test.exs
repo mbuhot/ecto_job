@@ -1,10 +1,11 @@
 defmodule EctoJob.WorkerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias EctoJob.Test.{JobQueue, Repo}
   alias Ecto.{Changeset, Multi}
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(EctoJob.Test.Repo, {:shared, self()})
   end
 
   test "start_link updates job state and starts Task" do

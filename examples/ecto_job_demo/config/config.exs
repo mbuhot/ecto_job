@@ -13,3 +13,10 @@ config :ecto_job_demo, EctoJobDemo.Repo,
   database: "ecto_job_demo",
   hostname: "localhost",
   pool_size: 10
+
+config :exq,
+  name: Exq,
+  host: "127.0.0.1",
+  namespace: "exq",
+  concurrency: 100,
+  queues: ["default"]

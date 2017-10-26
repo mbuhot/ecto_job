@@ -15,3 +15,7 @@ erl_crash.dump
 # secrets files as long as you replace their contents by environment
 # variables.
 /config/*.secret.exs
+
+.elixir_ls
+
+examples/ecto_job_demo/ecto_job_demo

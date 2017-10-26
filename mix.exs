@@ -7,7 +7,7 @@ defmodule EctoJob.Mixfile do
     [
       app: :ecto_job,
       version: "0.0.1",
-      elixir: "~> 1.4",
+      elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env),
       start_permanent: Mix.env == :prod,
       deps: deps(),
@@ -34,7 +34,7 @@ defmodule EctoJob.Mixfile do
 
   defp deps do
     [
-      {:ecto, "~> 2.2-rc"},
+      {:ecto, "~> 2.2"},
       {:postgrex, ">= 0.0.0"},
       {:gen_stage, ">= 0.0.0"},
       {:credo, ">= 0.0.0", only: :dev, runtime: false},

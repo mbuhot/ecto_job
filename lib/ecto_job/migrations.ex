@@ -51,9 +51,7 @@ defmodule EctoJob.Migrations do
         add :schedule, :utc_datetime, null: false, default: fragment("timezone('UTC', now())")
         add :attempt, :integer, null: false, default: 0
         add :max_attempts, :integer, null: false, default: 5
-        add :module, :string, null: false
-        add :function, :string, null: false
-        add :arguments, :binary, null: false
+        add :params, :map, null: false
         timestamps()
       end
 

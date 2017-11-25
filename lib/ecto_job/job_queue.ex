@@ -21,16 +21,17 @@ defmodule EctoJob.JobQueue do
     schedule: DateTime.t,
     attempt: integer,
     max_attempts: integer,
-    module: String.t,
-    function: String.t,
-    arguments: binary,
+    params: map,
     updated_at: DateTime.t,
     inserted_at: DateTime.t
   }
 
+  @callback perform(Multi.t, map) :: term
+
   defmacro __using__(table_name: table_name) do
     quote do
       use Ecto.Schema
+      @behaviour EctoJob.JobQueue
 
       schema unquote(table_name) do
         field :state, :string          # SCHEDULED, RESERVED, IN_PROGRESS, FAILED
@@ -38,9 +39,7 @@ defmodule EctoJob.JobQueue do
         field :schedule, :utc_datetime # Time at which a scheduled job can be reserved
         field :attempt, :integer       # Counter for number of attempts for this job
         field :max_attempts, :integer  # Maximum attempts before this job is FAILED
-        field :module, :string         # Module of client code to invoke
-        field :function, :string       # Function of client code to invoke
-        field :arguments, :binary      # List of function arguments, serialized with `term_to_binary`
+        field :params, :map            # Job params, serialized as JSONB
         timestamps()
       end
 
@@ -66,56 +65,43 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
-      Create a new #{__MODULE__} instance given {mod, func, args} tuple or closure callback.
+      Create a new #{__MODULE__} instance with the given job params.
+
+      Params will be serialized as JSON, so
 
       Options:
 
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
       """
-      @type work :: {module, atom, list} | (Multi.t -> term)
-      @spec new(work, Keyword.t) :: EctoJob.JobQueue.job
-      def new(work, opts \\ [])
-      def new({mod, func, args}, opts) when is_list(args) do
+      @spec new(map, Keyword.t) :: EctoJob.JobQueue.job
+      def new(params = %{}, opts \\ []) do
         %__MODULE__{
           state: (if opts[:schedule], do: "SCHEDULED", else: "AVAILABLE"),
           expires: nil,
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
           attempt: 0,
           max_attempts: opts[:max_attempts],
-          module: to_string(mod),
-          function: to_string(func),
-          arguments: :erlang.term_to_binary(args)
+          params: params
         }
-      end
-      def new(func, opts) when is_function(func) do
-        new({EctoJob.JobQueue, :perform, [func]}, opts)
       end
 
       @doc """
-      Adds a job to an Ecto.Multi given {mod, func, args} tuple or closure callback.
+      Adds a job to an Ecto.Multi, returning the new Ecto.Multi.
       This is the preferred method of enqueueing jobs along side other application updates.
 
       ## Example:
 
           Ecto.Multi.new()
           |> Ecto.Multi.insert(create_new_user_changeset(user_params))
-          |> MyApp.Job.enqueue("send_welcome_email", &SendWelcomeEmail.perform(&1, user_params))
+          |> MyApp.Job.enqueue("send_welcome_email", %{"type" => "SendWelcomeEmail", "user" => user_params})
           |> MyApp.Repo.transaction()
       """
-      @spec enqueue(Multi.t, term, work, Keyword.t) :: Multi.t
-      def enqueue(multi = %Multi{}, name,  work, opts \\ []) do
-        Multi.insert(multi, name, new(work, opts))
+      @spec enqueue(Multi.t, term, map, Keyword.t) :: Multi.t
+      def enqueue(multi = %Multi{}, name,  params, opts \\ []) do
+        Multi.insert(multi, name, new(params, opts))
       end
     end
-  end
-
-  @doc """
-  Named function to use when a job is enqueued with an anonymous function.
-  """
-  @spec perform(Multi.t, (Multi.t -> term)) :: term
-  def perform(multi, func) do
-    func.(multi)
   end
 
   @doc """
@@ -252,20 +238,6 @@ defmodule EctoJob.JobQueue do
     |> DateTime.to_unix()
     |> Kernel.+(300 * attempt)
     |> DateTime.from_unix!()
-  end
-
-  @doc """
-  Deserialize job arguments from strings and binary to atoms / and argument list
-  """
-  @spec deserialize_job_args(job) :: {:ok, {module, atom, list}} | {:error, term}
-  def deserialize_job_args(job) do
-    with args when is_list(args) <- :erlang.binary_to_term(job.arguments),
-         mod <- String.to_existing_atom(job.module),
-         func <- String.to_existing_atom(job.function) do
-      {:ok, {mod, func, [initial_multi(job) | args]}}
-    else
-      _ -> {:error, :bad_argument_list}
-    end
   end
 
   @doc """

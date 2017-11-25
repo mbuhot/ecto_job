@@ -21,9 +21,7 @@ defmodule EctoJob.JobQueueTest do
           :schedule,
           :attempt,
           :max_attempts,
-          :module,
-          :function,
-          :arguments,
+          :params,
           :inserted_at,
           :updated_at
         ]
@@ -31,45 +29,20 @@ defmodule EctoJob.JobQueueTest do
   end
 
   describe "JobQueue.new" do
-    test "contructs a Job from {Mod, Func, Args} tuple" do
-      job = EctoJob.Test.JobQueue.new({IO, :puts, ["hello"]})
-      assert %EctoJob.Test.JobQueue{module: "Elixir.IO", function: "puts"} = job
-    end
-
-    test "contructs a Job from a closure" do
-      job = EctoJob.Test.JobQueue.new(&IO.inspect(&1))
-      assert %EctoJob.Test.JobQueue{module: "Elixir.EctoJob.JobQueue", function: "perform"} = job
+    test "contructs a Job from params" do
+      job = EctoJob.Test.JobQueue.new(%{a: 1, b: "hello", c: [1,2,3]})
+      assert %EctoJob.Test.JobQueue{params: %{a: 1, b: "hello", c: [1,2,3]}} = job
     end
 
     test "Accepts a :schedule option" do
       at = DateTime.from_naive!(~N[2055-05-22T12:34:44], "Etc/UTC")
-      job = EctoJob.Test.JobQueue.new(&IO.inspect(&1), schedule: at)
+      job = EctoJob.Test.JobQueue.new(%{}, schedule: at)
       assert %{schedule: ^at, state: "SCHEDULED"} = job
     end
 
     test "Accepts a max_attempts option" do
-      job = EctoJob.Test.JobQueue.new(&IO.inspect(&1), max_attempts: 123)
+      job = EctoJob.Test.JobQueue.new(%{}, max_attempts: 123)
       assert job.max_attempts == 123
-    end
-
-    test "Serializes args to binary" do
-      job = EctoJob.Test.JobQueue.new(&IO.inspect(&1, label: :foo))
-      assert is_binary(job.arguments)
-    end
-  end
-
-  describe "JobQueue.deserialize_job_args" do
-    test "deserializes back to Elixir terms" do
-      job = EctoJob.Test.JobQueue.new({IO, :inspect, [[label: :foo]]})
-      assert {:ok, {IO, :inspect, [%Ecto.Multi{}, [label: :foo]]}} = EctoJob.JobQueue.deserialize_job_args(job)
-    end
-
-    test "Includes a Multi with delete job changeset" do
-      job = EctoJob.Test.JobQueue.new({IO, :inspect, [[label: :foo]]}) |> Map.put(:id, 123)
-
-      assert {:ok, {_, _, [multi = %Ecto.Multi{}, _]}} = EctoJob.JobQueue.deserialize_job_args(job)
-      assert [{"delete_job_123", {:delete, cs = %Ecto.Changeset{}, []}}] = Ecto.Multi.to_list(multi)
-      assert %{action: :delete, changes: %{attempt: 1}, data: ^job} = cs
     end
   end
 
@@ -77,16 +50,10 @@ defmodule EctoJob.JobQueueTest do
     test "Adds an operation to the Ecto.Multi" do
       multi =
         Ecto.Multi.new()
-        |> EctoJob.Test.JobQueue.enqueue(:a_job, &IO.inspect(&1), max_attempts: 3)
+        |> EctoJob.Test.JobQueue.enqueue(:a_job, %{}, max_attempts: 3)
         |> Ecto.Multi.to_list()
 
       assert [a_job: {:insert, %Ecto.Changeset{action: :insert, data: %EctoJob.Test.JobQueue{}}, []}] = multi
-    end
-  end
-
-  describe "JobQueue.perform" do
-    test "invokes the given function with argument" do
-      assert %Ecto.Multi{} = EctoJob.JobQueue.perform(Ecto.Multi.new(), & &1)
     end
   end
 
@@ -94,7 +61,7 @@ defmodule EctoJob.JobQueueTest do
     test "Updates scheduled job to active" do
       at = DateTime.from_naive! ~N[2017-08-17T12:23:34Z], "Etc/UTC"
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
-      %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(&IO.inspect(&1), schedule: at))
+      %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(%{}, schedule: at))
 
       count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
 
@@ -105,7 +72,7 @@ defmodule EctoJob.JobQueueTest do
     test "Does not activate job until scheduled time passed" do
       at = DateTime.from_naive! ~N[2017-08-17T12:23:34Z], "Etc/UTC"
       now = DateTime.from_naive! ~N[2017-08-17T12:20:00Z], "Etc/UTC"
-      %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(&IO.inspect(&1), schedule: at))
+      %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(%{}, schedule: at))
 
       count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
 
@@ -117,7 +84,7 @@ defmodule EctoJob.JobQueueTest do
       at = DateTime.from_naive! ~N[2017-08-17T12:23:34Z], "Etc/UTC"
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
       job =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1), schedule: at)
+        EctoJob.Test.JobQueue.new(%{}, schedule: at)
         |> Map.put(:state, "RESERVED")
         |> Repo.insert!()
 
@@ -134,7 +101,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
 
       %{id: id} =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "RESERVED")
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
@@ -150,7 +117,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
 
       %{id: id} =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "IN_PROGRESS")
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
@@ -166,7 +133,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:20:00Z], "Etc/UTC"
 
       %{id: id} =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "IN_PROGRESS")
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
@@ -182,7 +149,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
 
       %{id: id} =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1), max_attempts: 10)
+        EctoJob.Test.JobQueue.new(%{}, max_attempts: 10)
         |> Map.put(:state, "IN_PROGRESS")
         |> Map.put(:attempt, 10)
         |> Map.put(:expires, expiry)
@@ -202,7 +169,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
 
       %{id: id} =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1), max_attempts: 10)
+        EctoJob.Test.JobQueue.new(%{}, max_attempts: 10)
         |> Map.put(:state, "IN_PROGRESS")
         |> Map.put(:attempt, 10)
         |> Map.put(:expires, expiry)
@@ -218,7 +185,7 @@ defmodule EctoJob.JobQueueTest do
   describe "JobQueue.reserve_available_jobs" do
     test "RESERVES available jobs with 5 minute expiry" do
       for _ <- 1..5 do
-        Repo.insert!(EctoJob.Test.JobQueue.new(&IO.inspect(&1)))
+        Repo.insert!(EctoJob.Test.JobQueue.new(%{}))
       end
 
       {3, [a, b, c]} = EctoJob.JobQueue.reserve_available_jobs(Repo, EctoJob.Test.JobQueue, 3, DateTime.utc_now)
@@ -237,7 +204,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:20:00Z], "Etc/UTC"
 
       job =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "RESERVED")
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
@@ -255,7 +222,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:24:00Z], "Etc/UTC"
 
       job =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "RESERVED")
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
@@ -268,7 +235,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:20:00Z], "Etc/UTC"
 
       job =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "RESERVED")
         |> Map.put(:expires, expiry)
         |> Map.put(:attempt, 3)
@@ -282,7 +249,7 @@ defmodule EctoJob.JobQueueTest do
       now = DateTime.from_naive! ~N[2017-08-17T12:20:00Z], "Etc/UTC"
 
       job =
-        EctoJob.Test.JobQueue.new(&IO.inspect(&1))
+        EctoJob.Test.JobQueue.new(%{})
         |> Map.put(:state, "IN_PROGRESS")
         |> Map.put(:expires, expiry)
         |> Map.put(:attempt, 3)

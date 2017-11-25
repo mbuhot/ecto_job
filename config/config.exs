@@ -9,7 +9,7 @@ if Mix.env() == :test do
   config :ecto_job, EctoJob.Test.Repo,
     adapter: Ecto.Adapters.Postgres,
     username: "postgres",
-    password: "postgres",
+    password: "password",
     database: "ecto_job_test",
     hostname: "localhost",
     pool: Ecto.Adapters.SQL.Sandbox,

@@ -57,6 +57,18 @@ defmodule MyApp.JobQueue do
 end
 ```
 
+Add `perform/2` function to the job queue module, this is where jobs from the queue will be dispatched.
+
+```elixir
+defmodule MyApp.JobQueue do
+  use EctoJob.JobQueue, table_name: "jobs"
+
+  def perform(multi = %Ecto.Multi{}, job = %{}) do
+    ... job logic here ...
+  end
+end
+```
+
 Add your new JobQueue module as a supervisor to the application supervision tree:
 
 ```elixir
@@ -76,11 +88,14 @@ end
 
 ## Usage
 
-Define a function to run, accepting `%Ecto.Multi{}` as the first argument, followed by other application arguments:
+All jobs sent to a queue are eventually dispatched to the queue modules `perform/2` function.
+The `Ecto.Multi` struct must be passed to the `Ecto.Repo.transaction` function to complete the job, along with any other application updates.
 
 ```elixir
-defmodule MyApp.SendEmail do
-  def perform(multi = %Ecto.Multi{}, recipient, body) do
+defmodule MyApp.JobQueue do
+  use EctoJob.JobQueue, table_name: "jobs"
+
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail", "recipient" => recipient, "body" => body}) do
     multi
     |> Ecto.Multi.run(:send, fn _ -> EmailService.send(recipient, body))
     |> Ecto.Multi.insert(:stats, %EmailSendStats{recipient: recipient})
@@ -89,11 +104,24 @@ defmodule MyApp.SendEmail do
 end
 ```
 
+When a queue handles multiple job types, it is useful to pattern match on the job and delegate to a separate module:
+
+```elixir
+defmodule MyApp.JobQueue do
+  use EctoJob.JobQueue, table_name: "jobs"
+
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail"),      do: MyApp.SendEmail.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "CustomerReport"), do: MyApp.CustomerReport.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SyncWithCRM"),    do: MyApp.CRMSync.run(multi, job)
+  ...
+end
+```
+
 Enqueue jobs:
 
 Directly:
 ```elixir
-{MyApp.SendEmail, :perform, ["joe@gmail.com", "Welcome!"]}
+%{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
 |> MyApp.JobQueue.new()
 |> MyApp.Repo.insert()
 ```
@@ -102,7 +130,7 @@ As part of a Multi:
 ```elixir
 Ecto.Multi.new()
 |> Ecto.Multi.insert(:add_user, User.insert_changeset(%{name: "Joe", email: "joe@gmail.com"}))
-|> MyApp.JobQueue.enqueue(:email_job, &MyApp.SendEmail.perform(&1, "joe@gmail.com", "Welcome!"))
+|> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"})
 |> MyApp.Repo.transaction()
 ```
 

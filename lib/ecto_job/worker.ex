@@ -19,21 +19,20 @@ defmodule EctoJob.Worker do
   reactivated by the producer.
   """
   @spec start_link(repo, EctoJob.JobQueue.job, DateTime.t) :: {:ok, pid}
-  def start_link(repo, job, now) do
+  def start_link(repo, job = %queue{}, now) do
     Task.start_link(fn ->
-      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now),
-           {:ok, {mod, func, args}} <- JobQueue.deserialize_job_args(job) do
-        apply(mod, func, args)
+      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
+        queue.perform(JobQueue.initial_multi(job), job.params)
         log_duration(job, now)
       end
     end)
   end
 
   @spec log_duration(EctoJob.JobQueue.job, DateTime.t) :: :ok
-  defp log_duration(_job = %{module: mod, id: id}, start = %DateTime{}) do
+  defp log_duration(_job = %queue{id: id}, start = %DateTime{}) do
     start_unix = start |> DateTime.to_unix(:microseconds)
     end_unix = DateTime.utc_now() |> DateTime.to_unix(:microseconds)
     duration = end_unix - start_unix
-    Logger.info("#{mod}[#{id}] done: #{duration} µs")
+    Logger.info("#{queue}[#{id}] done: #{duration} µs")
   end
 end

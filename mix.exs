@@ -36,6 +36,7 @@ defmodule EctoJob.Mixfile do
     [
       {:ecto, "~> 2.2"},
       {:postgrex, ">= 0.0.0"},
+      {:poison, ">= 0.0.0"},
       {:gen_stage, ">= 0.0.0"},
       {:credo, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},

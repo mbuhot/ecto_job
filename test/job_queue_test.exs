@@ -22,6 +22,7 @@ defmodule EctoJob.JobQueueTest do
           :attempt,
           :max_attempts,
           :params,
+          :notify,
           :inserted_at,
           :updated_at
         ]

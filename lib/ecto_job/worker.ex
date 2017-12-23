@@ -24,15 +24,22 @@ defmodule EctoJob.Worker do
       with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
         queue.perform(JobQueue.initial_multi(job), job.params)
         log_duration(job, now)
+        notify_completed(repo, job)
       end
     end)
   end
 
   @spec log_duration(EctoJob.JobQueue.job, DateTime.t) :: :ok
   defp log_duration(_job = %queue{id: id}, start = %DateTime{}) do
-    start_unix = start |> DateTime.to_unix(:microseconds)
-    end_unix = DateTime.utc_now() |> DateTime.to_unix(:microseconds)
-    duration = end_unix - start_unix
+    duration = DateTime.diff(DateTime.utc_now(), start, :microseconds)
     Logger.info("#{queue}[#{id}] done: #{duration} µs")
+  end
+
+  @spec notify_completed(repo, EctoJob.JobQueue.job) :: :ok
+  defp notify_completed(_repo, _job = %{notify: nil}), do: :ok
+  defp notify_completed(repo, _job = %queue{notify: payload}) do
+    topic = queue.__schema__(:source) <> ".completed"
+    repo.query("SELECT pg_notify($1, $2)", [topic, payload])
+    :ok
   end
 end

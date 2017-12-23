@@ -52,6 +52,7 @@ defmodule EctoJob.Migrations do
         add :attempt, :integer, null: false, default: 0
         add :max_attempts, :integer, null: false, default: 5
         add :params, :map, null: false
+        add :notify, :string
         timestamps()
       end
 

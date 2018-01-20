@@ -6,22 +6,15 @@ defmodule EctoJob.Mixfile do
   def project do
     [
       app: :ecto_job,
+      description: "A transactional job queue built with Ecto, PostgreSQL and GenStage.",
       version: @version,
       elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      dialyzer: [
-        plt_add_apps: [:mix],
-        plt_add_deps: :apps_direct,
-        flags: ["-Werror_handling", "-Wno_unused", "-Wunmatched_returns", "-Wunderspecs"],
-        remove_defaults: [:unknown]
-      ],
-      docs: [
-        extras: ["README.md"],
-        source_ref: "v#{@version}",
-        source_url: "https://github.com/mbuhot/ecto_job"
-      ]
+      dialyzer: dialyzer(),
+      docs: docs(),
+      package: package()
     ]
   end
 
@@ -31,6 +24,31 @@ defmodule EctoJob.Mixfile do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      maintainers: ["Mike Buhot (m.buhot@gmail.com)"]
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:mix],
+      plt_add_deps: :apps_direct,
+      flags: ["-Werror_handling", "-Wno_unused", "-Wunmatched_returns", "-Wunderspecs"],
+      remove_defaults: [:unknown]
+    ]
+  end
+
+  defp docs do
+    [
+      extras: ["README.md"],
+      source_ref: "v#{@version}",
+      source_url: "https://github.com/mbuhot/ecto_job",
+      homepage_url: "https://github.com/mbuhot/ecto_job"
+    ]
+  end
 
   defp deps do
     [

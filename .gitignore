@@ -16,6 +16,9 @@ erl_crash.dump
 # variables.
 /config/*.secret.exs
 
+# IDE files
 .elixir_ls
+.vscode/launch.json
 
+# escript output
 examples/ecto_job_demo/ecto_job_demo

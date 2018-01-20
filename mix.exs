@@ -2,6 +2,7 @@ defmodule EctoJob.Mixfile do
   use Mix.Project
 
   @version "0.1.0"
+  @url "https://github.com/mbuhot/ecto_job"
 
   def project do
     [
@@ -28,7 +29,10 @@ defmodule EctoJob.Mixfile do
   defp package do
     [
       licenses: ["MIT"],
-      maintainers: ["Mike Buhot (m.buhot@gmail.com)"]
+      maintainers: ["Mike Buhot (m.buhot@gmail.com)"],
+      links: %{
+        "Github" => @url
+      }
     ]
   end
 
@@ -45,8 +49,8 @@ defmodule EctoJob.Mixfile do
     [
       extras: ["README.md"],
       source_ref: "v#{@version}",
-      source_url: "https://github.com/mbuhot/ecto_job",
-      homepage_url: "https://github.com/mbuhot/ecto_job"
+      source_url: @url,
+      homepage_url: @url
     ]
   end
 

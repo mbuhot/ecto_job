@@ -15,6 +15,7 @@ defmodule AsyncJobApi.JobCompleteNotifier do
     Registry.dispatch(AsyncJobApi.ConnRegistry, payload, fn [{pid, conn}] ->
       send(pid, {:job_completed, payload})
     end)
+
     {:noreply, state}
   end
 end

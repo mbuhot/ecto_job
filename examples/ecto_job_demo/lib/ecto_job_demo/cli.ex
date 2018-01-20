@@ -1,7 +1,7 @@
 defmodule EctoJobDemo.CLI do
   def main([n, mode]) do
     n
-    |> Integer.parse
+    |> Integer.parse()
     |> elem(0)
     |> enqueue_jobs(mode)
 
@@ -9,16 +9,16 @@ defmodule EctoJobDemo.CLI do
   end
 
   defp enqueue_jobs(n, "ecto_job") do
-    Enum.each (1 .. n), fn i ->
+    Enum.each(1..n, fn i ->
       {EctoJobDemo, :hello, [i]}
       |> EctoJobDemo.JobQueue.new()
       |> EctoJobDemo.Repo.insert!()
-    end
+    end)
   end
 
   defp enqueue_jobs(n, "exq") do
-    Enum.each (1 .. n), fn i ->
-      Exq.enqueue Exq.Enqueuer, "default", EctoJobDemo, [i]
-    end
+    Enum.each(1..n, fn i ->
+      Exq.enqueue(Exq.Enqueuer, "default", EctoJobDemo, [i])
+    end)
   end
 end

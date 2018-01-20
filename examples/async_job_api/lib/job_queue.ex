@@ -6,6 +6,7 @@ defmodule AsyncJobApi.JobQueue do
   @impl EctoJob.JobQueue
   def perform(multi, _job) do
     Process.sleep(10000)
+
     multi
     |> Repo.transaction()
   end

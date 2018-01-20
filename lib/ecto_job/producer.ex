@@ -28,12 +28,12 @@ defmodule EctoJob.Producer do
     defstruct [:repo, :schema, :notifier, :demand, :clock]
 
     @type t :: %__MODULE__{
-      repo: EctoJob.Producer.repo,
-      schema: EctoJob.Producer.schema,
-      notifier: EctoJob.Producer.notifier,
-      demand: integer,
-      clock: (() -> DateTime.t)
-    }
+            repo: EctoJob.Producer.repo(),
+            schema: EctoJob.Producer.schema(),
+            notifier: EctoJob.Producer.notifier(),
+            demand: integer,
+            clock: (() -> DateTime.t())
+          }
   end
 
   @doc """
@@ -43,7 +43,7 @@ defmodule EctoJob.Producer do
    - `schema` : The EctoJob.JobQueue module to query
    - `notifier` : The name of the `Postgrex.Notifications` notifier process
   """
-  @spec start_link([name: atom, repo: repo, schema: schema, notifier: atom]) :: {:ok, pid}
+  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom) :: {:ok, pid}
   def start_link(name: name, repo: repo, schema: schema, notifier: notifier) do
     GenStage.start_link(
       __MODULE__,
@@ -54,14 +54,15 @@ defmodule EctoJob.Producer do
         demand: 0,
         clock: &DateTime.utc_now/0
       },
-      name: name)
+      name: name
+    )
   end
 
   @doc """
   Starts the sweeper timer to activate scheduled/expired jobs and starts listening for new job notifications.
   """
   @impl true
-  @spec init(State.t) :: {:producer, State.t}
+  @spec init(State.t()) :: {:producer, State.t()}
   def init(state = %State{notifier: notifier, schema: schema}) do
     _ = start_timer()
     _ = start_listener(notifier, schema)
@@ -69,7 +70,7 @@ defmodule EctoJob.Producer do
   end
 
   # Starts the sweeper timer to activate scheduled/expired jobs
-  @spec start_timer() :: {:ok, :timer.tref}
+  @spec start_timer() :: {:ok, :timer.tref()}
   defp start_timer do
     {:ok, _ref} = :timer.send_interval(60_000, :poll)
   end
@@ -89,19 +90,22 @@ defmodule EctoJob.Producer do
   `:notification` messages will dispatch any active jobs according to current demand.
   """
   @impl true
-  @spec handle_info(term, State.t) :: {:noreply, [JobQueue.job], State.t}
+  @spec handle_info(term, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
   def handle_info(_, state = %State{demand: 0}) do
     {:noreply, [], state}
   end
+
   def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
     now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
+
     if activate_jobs(repo, schema, now) > 0 do
       dispatch_jobs(state, now)
     else
       {:noreply, [], state}
     end
   end
+
   def handle_info({:notification, _pid, _ref, _channel, _payload}, state = %State{clock: clock}) do
     dispatch_jobs(state, clock.())
   end
@@ -110,20 +114,20 @@ defmodule EctoJob.Producer do
   Dispatch jobs according to the new demand plus any buffered demand.
   """
   @impl true
-  @spec handle_demand(integer, State.t) :: {:noreply, [JobQueue.job], State.t}
+  @spec handle_demand(integer, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
   def handle_demand(demand, state = %State{demand: buffered_demand, clock: clock}) do
     dispatch_jobs(%{state | demand: demand + buffered_demand}, clock.())
   end
 
   # Acivate sheduled jobs and expired jobs, returning the number of jobs activated
-  @spec activate_jobs(repo, schema, DateTime.t) :: integer
+  @spec activate_jobs(repo, schema, DateTime.t()) :: integer
   defp activate_jobs(repo, schema, now = %DateTime{}) do
     JobQueue.activate_scheduled_jobs(repo, schema, now) +
-    JobQueue.activate_expired_jobs(repo, schema, now)
+      JobQueue.activate_expired_jobs(repo, schema, now)
   end
 
   # Reserve jobs according to demand, and construct the GenState reply tuple
-  @spec dispatch_jobs(State.t, DateTime.t) :: {:noreply, [JobQueue.job], State.t}
+  @spec dispatch_jobs(State.t(), DateTime.t()) :: {:noreply, [JobQueue.job()], State.t()}
   defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}, now) do
     {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now)
     {:noreply, jobs, %{state | demand: demand - count}}

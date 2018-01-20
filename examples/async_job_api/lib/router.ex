@@ -1,8 +1,8 @@
 defmodule AsyncJobApi.Router do
   use Plug.Router
 
-  plug :match
-  plug :dispatch
+  plug(:match)
+  plug(:dispatch)
 
-  get "/report", to: AsyncJobApi.ReportHandler
+  get("/report", to: AsyncJobApi.ReportHandler)
 end

@@ -4,5 +4,4 @@ defmodule EctoJob.Test.JobQueue do
   def perform(multi, params) do
     IO.inspect({multi, params})
   end
-
 end

@@ -4,7 +4,13 @@ defmodule EctoJob.JobQueue do
 
   ## Example
 
-      use EctoJob.JobQueue table_name: "jobs"
+      defmodule MyApp.JobQueue do
+        use EctoJob.JobQueue, table_name: "jobs"
+
+        def perform(multi = %Ecto.Multi{}, job = %{}) do
+          ...
+        end
+      end
   """
 
   alias Ecto.{Changeset, Multi}
@@ -22,6 +28,7 @@ defmodule EctoJob.JobQueue do
     attempt: integer,
     max_attempts: integer,
     params: map,
+    notify: String.t | nil,
     updated_at: DateTime.t,
     inserted_at: DateTime.t
   }
@@ -40,6 +47,7 @@ defmodule EctoJob.JobQueue do
         field :attempt, :integer       # Counter for number of attempts for this job
         field :max_attempts, :integer  # Maximum attempts before this job is FAILED
         field :params, :map            # Job params, serialized as JSONB
+        field :notify, :string         # Payload used to notify that job has completed
         timestamps()
       end
 
@@ -82,7 +90,8 @@ defmodule EctoJob.JobQueue do
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
           attempt: 0,
           max_attempts: opts[:max_attempts],
-          params: params
+          params: params,
+          notify: opts[:notify]
         }
       end
 

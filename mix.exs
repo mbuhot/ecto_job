@@ -1,12 +1,12 @@
 defmodule EctoJob.Mixfile do
   use Mix.Project
 
-  @version "0.0.1"
+  @version "0.1.0"
 
   def project do
     [
       app: :ecto_job,
-      version: "0.0.1",
+      version: @version,
       elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env),
       start_permanent: Mix.env == :prod,
@@ -26,7 +26,7 @@ defmodule EctoJob.Mixfile do
   end
 
   def application do
-    []
+    [extra_applications: [:logger]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]

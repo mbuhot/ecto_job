@@ -1,5 +1,8 @@
 [![Build Status](https://travis-ci.org/mbuhot/ecto_job.svg?branch=master)](https://travis-ci.org/mbuhot/ecto_job)
+[![Hex.pm](https://img.shields.io/hexpm/v/ecto_job.svg)](https://hex.pm/packages/ecto_job)
+[![HexDocs](https://img.shields.io/badge/api-docs-yellow.svg)](https://hexdocs.pm/ecto_job/)
 [![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg?branch=master&style=flat)](http://inch-ci.org/github/mbuhot/ecto_job)
+[![License](https://img.shields.io/hexpm/l/ecto_job.svg)](https://github.com/mbuhot/ecto_job/blob/master/LICENSE)
 
 # EctoJob
 

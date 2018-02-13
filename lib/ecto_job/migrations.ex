@@ -69,7 +69,7 @@ defmodule EctoJob.Migrations do
     Drops the job queue table with the given name, and associated trigger
     """
     def down(name) do
-      execute("DROP FUNCTION tr_notify_inserted_#{name}()")
+      execute("DROP TRIGGER tr_notify_inserted_#{name} ON #{name}")
       execute("DROP TABLE #{name}")
     end
   end

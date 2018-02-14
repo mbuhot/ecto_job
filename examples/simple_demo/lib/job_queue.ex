@@ -22,7 +22,9 @@ defmodule SimpleDemo.JobQueue do
 
   end
 
-  def make_some_work(payload), do:
+  def make_some_work(payload) do
     IO.inspect("I am working on #{payload} now")
+    {:ok, :nothing}
+  end
 
 end

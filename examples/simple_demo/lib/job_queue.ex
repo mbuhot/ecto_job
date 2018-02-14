@@ -4,25 +4,21 @@ defmodule SimpleDemo.JobQueue do
   alias Ecto.Multi
   require IEx
 
-  @type payload :: map()
-  @doc "test our job TODO: move to test"
+  @doc "send some payload to test"
   def enqueue(payload) do
-    job = %{"type" => "test", "payload" => "jim@jim.com"}
+    job = %{"type" => "test", "payload" => payload}
 
     Ecto.Multi.new()
-      |> SimpleDemo.JobQueue.enqueue(:invoice_job, job)
+      |> SimpleDemo.JobQueue.enqueue(:some_job, job)
       |> SimpleDemo.Repo.transaction()
   end
 
 
-  @doc """
-  The actual work to be donw here is from this file.
-  """
 
   def perform(multi = %Ecto.Multi{}, job = %{"type" => "test", "payload" => payload}) do
     multi
       |> Ecto.Multi.run(:send, fn _ -> make_some_work(payload)  end)
-      |> BigData.Repo.transaction()
+      |> SimpleDemo.Repo.transaction()
 
   end
 

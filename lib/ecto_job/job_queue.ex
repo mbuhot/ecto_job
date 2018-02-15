@@ -294,21 +294,34 @@ defmodule EctoJob.JobQueue do
 
   @doc """
   When something is wrong during the job execution, and we get an error,
-  we update the error list
+  we update the error list. We pattern match something similar this:
+  %{ :good_work => :nothing, "delete_job_9" => %    SimpleDemo.JobQueue{
+    __meta__: #Ecto.Schema.Metadata<:deleted, "jobs">,
+    attempt: 1,
+    errors: [],
+    expires: #DateTime<2018-02-15 13:26:51.000000Z>,
+    id: 9,
+    updated_at: ~N[2018-02-15 13:21:51.725191]
+    }
+  }
   """
   @spec update_error(repo, job, error_message) :: {:ok, job} | {:error, :expired}
-  def update_error(repo, job = %schema{id: id}, error_message) do
-    repo.update_all(
-      Query.from(
-        job in schema,
-        where: job.id == ^id
-      ),
-      [
-        set: [
-        error: ["ERROR #{error_message}"] ]
-      ]
-    )
+  def update_error(repo, %{ :good_work => b, "delete_job_11" => job}, error_message) do
+    IO.inspect(job)
+    job
   end
+  # def update_error(repo, job = %schema{id: id}, error_message) do
+  #   repo.update_all(
+  #     Query.from(
+  #       job in schema,
+  #       where: job.id == ^id
+  #     ),
+  #     [
+  #       set: [
+  #       error: ["ERROR #{error_message}"] ]
+  #     ]
+  #   )
+  # end
   @doc """
   Creates a changeset that will delete a job, confirming that the attempt counter hasn't been
   increased by another worker process.

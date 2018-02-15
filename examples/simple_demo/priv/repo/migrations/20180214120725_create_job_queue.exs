@@ -4,6 +4,7 @@ defmodule SimpleDemo.Repo.Migrations.CreateJobQueue do
   def up do
     EctoJob.Migrations.Install.up()
     EctoJob.Migrations.CreateJobTable.up("jobs")
+    EctoJob.Migrations.CreateJobTable.upgrade("jobs", "v0.2.0")
   end
 
   def down do

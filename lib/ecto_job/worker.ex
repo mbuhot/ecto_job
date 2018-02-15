@@ -1,4 +1,5 @@
 defmodule EctoJob.Worker do
+  require IEx
   @moduledoc """
   Worker module responsible for executing a single Job
   """
@@ -22,9 +23,14 @@ defmodule EctoJob.Worker do
   def start_link(repo, job = %queue{}, now) do
     Task.start_link(fn ->
       with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
-        queue.perform(JobQueue.initial_multi(job), job.params)
-        log_duration(job, now)
-        notify_completed(repo, job)
+        try do
+          queue.perform(JobQueue.initial_multi(job), job.params)
+        rescue
+          e in RuntimeError -> JobQueue.update_error(repo, job, e)
+        after
+          log_duration(job, now)
+          notify_completed(repo, job)
+        end
       end
     end)
   end
@@ -44,3 +50,6 @@ defmodule EctoJob.Worker do
     :ok
   end
 end
+
+
+

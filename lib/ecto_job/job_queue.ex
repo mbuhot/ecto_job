@@ -18,6 +18,7 @@ defmodule EctoJob.JobQueue do
 
   @type repo :: module
   @type schema :: module
+  @type error_message :: String.t()
   @type state :: String.t()
   @type job :: %{
           __struct__: :atom,
@@ -30,7 +31,8 @@ defmodule EctoJob.JobQueue do
           params: map,
           notify: String.t() | nil,
           updated_at: DateTime.t(),
-          inserted_at: DateTime.t()
+          inserted_at: DateTime.t(),
+          errors: list(binary)
         }
 
   @callback perform(Multi.t(), map) :: term
@@ -55,6 +57,8 @@ defmodule EctoJob.JobQueue do
         field(:params, :map)
         # Payload used to notify that job has completed
         field(:notify, :string)
+        # List of errors added by failed jobs
+        field(:errors, {:array, :string})
         timestamps()
       end
 
@@ -98,7 +102,8 @@ defmodule EctoJob.JobQueue do
           attempt: 0,
           max_attempts: opts[:max_attempts],
           params: params,
-          notify: opts[:notify]
+          notify: opts[:notify],
+          errors: []
         }
       end
 
@@ -287,6 +292,23 @@ defmodule EctoJob.JobQueue do
     |> Multi.delete("delete_job_#{job.id}", delete_job_changeset(job))
   end
 
+  @doc """
+  When something is wrong during the job execution, and we get an error,
+  we update the error list
+  """
+  @spec update_error(repo, job, error_message) :: {:ok, job} | {:error, :expired}
+  def update_error(repo, job = %schema{id: id}, error_message) do
+    repo.update_all(
+      Query.from(
+        job in schema,
+        where: job.id == ^id
+      ),
+      [
+        set: [
+        error: ["ERROR #{error_message}"] ]
+      ]
+    )
+  end
   @doc """
   Creates a changeset that will delete a job, confirming that the attempt counter hasn't been
   increased by another worker process.

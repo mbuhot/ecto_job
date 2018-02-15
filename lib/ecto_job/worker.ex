@@ -27,7 +27,7 @@ defmodule EctoJob.Worker do
         case queue.perform(JobQueue.initial_multi(job), job.params) do
           {:ok, res} -> IO.inspect(res)
           {:error, reason} -> JobQueue.update_error(repo, job, reason)
-          {:error, _ , message, job} -> JobQueue.update_error(repo, job, message)
+          {:error, _ , message, job} -> JobQueue.update_error(repo, extract_job(job), message)
           error -> IO.inspect(error)
         end
         log_duration(job, now)
@@ -50,6 +50,12 @@ defmodule EctoJob.Worker do
     repo.query("SELECT pg_notify($1, $2)", [topic, payload])
     :ok
   end
+
+  # extract job from %{ :good_work => :nothing, "delete_job_9" 
+  # => %{ __meta__: "Ecto.Schema.Metadata<:deleted", attempt: 1,
+  defp extract_job(multi_response), do:
+     multi_response |> Map.to_list |> List.last |> elem(1)
+
 end
 
 

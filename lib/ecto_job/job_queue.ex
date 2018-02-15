@@ -292,6 +292,7 @@ defmodule EctoJob.JobQueue do
     |> Multi.delete("delete_job_#{job.id}", delete_job_changeset(job))
   end
 
+
   @doc """
   When something is wrong during the job execution, and we get an error,
   we update the error list. We pattern match something similar this:
@@ -306,22 +307,12 @@ defmodule EctoJob.JobQueue do
   }
   """
   @spec update_error(repo, job, error_message) :: {:ok, job} | {:error, :expired}
-  def update_error(repo, %{ :good_work => b, "delete_job_11" => job}, error_message) do
-    IO.inspect(job)
-    job
+  def   update_error(repo, job = %schema{id: id}, error_message) do
+    Query.from(job in schema, where: job.id == ^id)
+      |> repo.update_all(push: [errors: error_message])
   end
-  # def update_error(repo, job = %schema{id: id}, error_message) do
-  #   repo.update_all(
-  #     Query.from(
-  #       job in schema,
-  #       where: job.id == ^id
-  #     ),
-  #     [
-  #       set: [
-  #       error: ["ERROR #{error_message}"] ]
-  #     ]
-  #   )
-  # end
+
+
   @doc """
   Creates a changeset that will delete a job, confirming that the attempt counter hasn't been
   increased by another worker process.
@@ -333,3 +324,13 @@ defmodule EctoJob.JobQueue do
     |> Changeset.optimistic_lock(:attempt)
   end
 end
+
+
+
+    #   Query.from(
+    #     job in schema,
+    #     where: job.id == ^id
+    #   ), [
+    #   push: [
+    #   errors: ["ERROR #{error_message}"] ]
+    # ])

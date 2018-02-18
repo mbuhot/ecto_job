@@ -1,4 +1,5 @@
 defmodule EctoJob.Worker do
+  require IEx
   @moduledoc """
   Worker module responsible for executing a single Job
   """
@@ -17,12 +18,18 @@ defmodule EctoJob.Worker do
   Start a worker process given a repo module and a job struct
   This may fail if the job reservation has expired, in which case the job will be
   reactivated by the producer.
+  SimpleDemo.JobQueue.enqueue("jim")
   """
   @spec start_link(repo, EctoJob.JobQueue.job(), DateTime.t()) :: {:ok, pid}
   def start_link(repo, job = %queue{}, now) do
     Task.start_link(fn ->
       with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
-        queue.perform(JobQueue.initial_multi(job), job.params)
+        case queue.perform(JobQueue.initial_multi(job), job.params) do
+          {:ok, res} -> IO.inspect(res)
+          {:error, reason} -> JobQueue.update_error(repo, job, reason)
+          {:error, _ , message, job} -> JobQueue.update_error(repo, extract_job(job), message)
+          error -> IO.inspect(error)
+        end
         log_duration(job, now)
         notify_completed(repo, job)
       end
@@ -43,4 +50,13 @@ defmodule EctoJob.Worker do
     repo.query("SELECT pg_notify($1, $2)", [topic, payload])
     :ok
   end
+
+  # extract job from %{ :good_work => :nothing, "delete_job_9" 
+  # => %{ __meta__: "Ecto.Schema.Metadata<:deleted", attempt: 1,
+  defp extract_job(multi_response), do:
+     multi_response |> Map.to_list |> List.last |> elem(1)
+
 end
+
+
+

@@ -65,6 +65,24 @@ defmodule EctoJob.Migrations do
       """)
     end
 
+    @doc"""
+    Upgrade jobs table to version v0.2.0, adding an error field to the first schema. Alter your
+    MyApp.Repo.Migrations.CreateJobQueue to:
+
+      def up do
+        table_name = "jobs"
+        EctoJob.Migrations.Install.up()
+        EctoJob.Migrations.CreateJobTable.up(table_name)
+        EctoJob.Migrations.CreateJobTable.upgrade(table_name, "v0.2.0")
+      end
+    """
+    def upgrade(name, "v0.2.0") do
+      _ =
+        alter table(name) do
+          add :errors, {:array, :string}
+        end
+
+    end
     @doc """
     Drops the job queue table with the given name, and associated trigger
     """

@@ -32,7 +32,7 @@ defmodule EctoJob.JobQueue do
           notify: String.t() | nil,
           updated_at: DateTime.t(),
           inserted_at: DateTime.t(),
-          errors: list(binary)
+          errors: list(error_message)
         }
 
   @callback perform(Multi.t(), map) :: term
@@ -324,13 +324,3 @@ defmodule EctoJob.JobQueue do
     |> Changeset.optimistic_lock(:attempt)
   end
 end
-
-
-
-    #   Query.from(
-    #     job in schema,
-    #     where: job.id == ^id
-    #   ), [
-    #   push: [
-    #   errors: ["ERROR #{error_message}"] ]
-    # ])

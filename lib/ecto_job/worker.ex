@@ -18,17 +18,16 @@ defmodule EctoJob.Worker do
   Start a worker process given a repo module and a job struct
   This may fail if the job reservation has expired, in which case the job will be
   reactivated by the producer.
-  SimpleDemo.JobQueue.enqueue("jim")
   """
   @spec start_link(repo, EctoJob.JobQueue.job(), DateTime.t()) :: {:ok, pid}
   def start_link(repo, job = %queue{}, now) do
     Task.start_link(fn ->
       with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
         case queue.perform(JobQueue.initial_multi(job), job.params) do
-          {:ok, res} -> IO.inspect(res)
+          {:ok, res} -> res
           {:error, reason} -> JobQueue.update_error(repo, job, reason)
-          {:error, _ , message, job} -> JobQueue.update_error(repo, extract_job(job), message)
-          error -> IO.inspect(error)
+          {:error, _ , message, changes_so_far} -> JobQueue.update_error(repo, extract_job(changes_so_far), message)
+          error -> raise "Unexpected return from job worker: #{error}"
         end
         log_duration(job, now)
         notify_completed(repo, job)

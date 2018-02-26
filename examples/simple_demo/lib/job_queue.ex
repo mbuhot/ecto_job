@@ -2,9 +2,11 @@ defmodule SimpleDemo.JobQueue do
   require Logger
   use EctoJob.JobQueue, table_name: "jobs"
   alias Ecto.Multi
-  require IEx
 
-  @doc "send some payload to test"
+  @doc """
+  From the prompt, after iex -S mix, send some payload here to test, like:
+  SimpleDemo.JobQueue.enqueue("some payload here")
+  """
   def enqueue(payload) do
     job = %{"type" => "test", "payload" => payload}
 
@@ -17,8 +19,8 @@ defmodule SimpleDemo.JobQueue do
 
   def perform(multi = %Ecto.Multi{}, job = %{"type" => "test", "payload" => payload}) do
     multi
-      |> Ecto.Multi.run(:good_work, fn _ -> make_some_work(payload)  end)
-      |> Ecto.Multi.run(:wrong_work, fn _ -> make_a_wrong_work(payload)  end)
+      |> Multi.run(:good_work, fn _ -> make_some_work(payload)  end)
+      |> Multi.run(:wrong_work, fn _ -> make_a_wrong_work(payload)  end)
       |> SimpleDemo.Repo.transaction()
 
   end

@@ -125,7 +125,7 @@ defmodule MyApp.JobQueue do
 
   def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail", "recipient" => recipient, "body" => body}) do
     multi
-    |> Ecto.Multi.run(:send, fn _ -> EmailService.send(recipient, body))
+    |> Ecto.Multi.run(:send, fn _ -> EmailService.send(recipient, body) end)
     |> Ecto.Multi.insert(:stats, %EmailSendStats{recipient: recipient})
     |> MyApp.Repo.transaction()
   end

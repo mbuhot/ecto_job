@@ -72,7 +72,7 @@ defmodule EctoJob.Producer do
   # Starts the sweeper timer to activate scheduled/expired jobs
   @spec start_timer() :: {:ok, :timer.tref()}
   defp start_timer do
-    {:ok, _ref} = :timer.send_interval(60_000, :poll)
+    {:ok, _ref} = :timer.send_interval(Application.get_env(:ecto_job, :poll_interval, 60_000), :poll)
   end
 
   # Starts listening to notifications from postgrex for new jobs

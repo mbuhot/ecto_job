@@ -144,7 +144,13 @@ defmodule MyApp.JobQueue do
   ...
 end
 ```
+### Options
 
+You can customize how often the table is polled for scheduled jobs.  The default is `60_000` ms.
+
+```
+config :ecto_job, :poll_interval, 15_000
+```
 
 ## How it works
 

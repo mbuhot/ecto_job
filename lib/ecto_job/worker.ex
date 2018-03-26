@@ -32,7 +32,9 @@ defmodule EctoJob.Worker do
   @spec log_duration(EctoJob.JobQueue.job(), DateTime.t()) :: :ok
   defp log_duration(_job = %queue{id: id}, start = %DateTime{}) do
     duration = DateTime.diff(DateTime.utc_now(), start, :microseconds)
-    Logger.info("#{queue}[#{id}] done: #{duration} µs")
+    if Application.get_env(:ecto_job, :disable_logging, false) do
+      Logger.info("#{queue}[#{id}] done: #{duration} µs")
+    end
   end
 
   @spec notify_completed(repo, EctoJob.JobQueue.job()) :: :ok

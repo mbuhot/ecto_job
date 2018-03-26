@@ -152,6 +152,12 @@ You can customize how often the table is polled for scheduled jobs.  The default
 config :ecto_job, :poll_interval, 15_000
 ```
 
+You can disable the log messages sent when a job completes.  The default is that they are enabled.
+
+```
+config :ecto_job, :disable_logging, true
+```
+
 ## How it works
 
 Each job queue is represented as a PostgreSQL table and Ecto schema.

@@ -48,6 +48,7 @@ defmodule EctoJob.Mixfile do
   defp docs do
     [
       extras: ["README.md"],
+      main: "readme",
       source_ref: "v#{@version}",
       source_url: @url,
       homepage_url: @url

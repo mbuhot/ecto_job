@@ -7,7 +7,8 @@ defmodule EctoJob.JobQueue do
       defmodule MyApp.JobQueue do
         use EctoJob.JobQueue, table_name: "jobs"
 
-        def perform(multi = %Ecto.Multi{}, job = %{}) do
+        @spec perform(Ecto.Multi.t(), map()) :: any()
+        def perform(multi, job = %{}) do
           ...
         end
       end
@@ -16,7 +17,10 @@ defmodule EctoJob.JobQueue do
   alias Ecto.{Changeset, Multi}
   require Ecto.Query, as: Query
 
+  @typedoc "An `Ecto.Repo` module name"
   @type repo :: module
+
+  @typedoc "An `Ecto.Schema` module name"
   @type schema :: module
 
   @typedoc """
@@ -30,6 +34,9 @@ defmodule EctoJob.JobQueue do
   """
   @type state :: String.t()
 
+  @typedoc """
+  A job `Ecto.Schema` struct.
+  """
   @type job :: %{
           __struct__: module,
           id: integer | nil,
@@ -44,7 +51,16 @@ defmodule EctoJob.JobQueue do
           updated_at: DateTime.t() | nil
         }
 
-  @callback perform(Multi.t(), map) :: term
+  @doc """
+  Job execution callback to be implemented by each `JobQueue` module.
+
+  ## Example
+
+      @impl true
+      def perform(multi, params = %{"type" => "new_user"}), do: NewUser.perform(multi, params)
+      def perform(multi, params = %{"type" => "sync_crm"}), do: SyncCRM.perform(multi, params)
+  """
+  @callback perform(multi :: Multi.t(), params :: map) :: any()
 
   defmacro __using__(table_name: table_name) do
     quote do
@@ -84,7 +100,7 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
-      Start the JobQueue.Supervisor using the current module as the queue schema.
+      Start the `JobQueue.Supervisor` using the current module as the queue schema.
 
       See `EctoJob.Config` for available configuration options.
 
@@ -99,7 +115,7 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
-      Create a new #{__MODULE__} instance with the given job params.
+      Create a new `#{__MODULE__}` instance with the given job params.
 
       Params will be serialized as JSON, so
 
@@ -122,7 +138,8 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
-      Adds a job to an Ecto.Multi, returning the new Ecto.Multi.
+      Adds a job to an `Ecto.Multi`, returning the new `Ecto.Multi`.
+
       This is the preferred method of enqueueing jobs along side other application updates.
 
       ## Example:
@@ -140,7 +157,8 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs in the SCHEDULED state with scheduled time <= now to "AVAILABLE" state.
+  Updates all jobs in the `"SCHEDULED"` state with scheduled time <= now to `"AVAILABLE"` state.
+
   Returns the number of jobs updated.
   """
   @spec activate_scheduled_jobs(repo, schema, DateTime.t()) :: integer
@@ -159,7 +177,8 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs in the RESERVED or IN_PROGRESS state with expires time <= now to "AVAILABLE" state.
+  Updates all jobs in the `"RESERVED"` or `"IN_PROGRESS"` state with expires time <= now to `"AVAILABLE"` state.
+
   Returns the number of jobs updated.
   """
   @spec activate_expired_jobs(repo, schema, DateTime.t()) :: integer
@@ -179,7 +198,8 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs that have been attempted the maximum number of times to FAILED.
+  Updates all jobs that have been attempted the maximum number of times to `"FAILED"`.
+
   Returns the number of jobs updated.
   """
   @spec fail_expired_jobs_at_max_attempts(repo, schema, DateTime.t()) :: integer
@@ -199,9 +219,10 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates a batch of jobs in AVAILABLE state ot RESERVED state with an expiry.
+  Updates a batch of jobs in `"AVAILABLE"` state to `"RESERVED"` state with an expiry.
+
   The batch size is determined by `demand`.
-  returns {count, updated_jobs} tuple.
+  returns `{count, updated_jobs}` tuple.
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t()) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}) do
@@ -214,6 +235,7 @@ defmodule EctoJob.JobQueue do
 
   @doc """
   Builds a query for a batch of available jobs.
+
   The batch size is determined by `demand`
   """
   @spec available_jobs(schema, integer) :: Ecto.Query.t()
@@ -244,18 +266,18 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Transitions a job from RESERVED to IN_PROGRESS.
+  Transitions a job from `"RESERVED"` to `"IN_PROGRESS"`.
 
   Confirms that the job reservation hasn't expired by checking:
 
    - The attempt counter hasn't been changed
-   - The state is still RESERVED
+   - The state is still `"RESERVED"`
    - The expiry time is in the future
 
-  Updates the state to "IN_PROGRESS", increments the attempt counter, and sets an
+  Updates the state to `"IN_PROGRESS"`, increments the attempt counter, and sets an
   expiry time, proportional to the attempt counter.
 
-  Returns {:ok, job} when sucessful, {:error, :expired} otherwise.
+  Returns `{:ok, job}` when sucessful, `{:error, :expired}` otherwise.
   """
   @spec update_job_in_progress(repo, job, DateTime.t()) :: {:ok, job} | {:error, :expired}
   def update_job_in_progress(repo, job = %schema{}, now) do
@@ -286,7 +308,7 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Computes the expiry time for an IN_PROGRESS job based on the current time and attempt counter
+  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter
   """
   @spec progress_expiry(DateTime.t(), integer) :: DateTime.t()
   def progress_expiry(now, attempt) do
@@ -297,7 +319,8 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Creates an Ecto.Multi struct with the command to delete the given job from the queue.
+  Creates an `Ecto.Multi` struct with the command to delete the given job from the queue.
+
   This will be passed as the first argument to the user supplied callback function.
   """
   @spec initial_multi(job) :: Multi.t()
@@ -307,7 +330,7 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Creates a changeset that will delete a job, confirming that the attempt counter hasn't been
+  Creates an `Ecto.Changeset` that will delete a job, confirming that the attempt counter hasn't been
   increased by another worker process.
   """
   @spec delete_job_changeset(job) :: Changeset.t()

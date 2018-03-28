@@ -1,6 +1,7 @@
 # 0.2.0
 
 [#9](https://github.com/mbuhot/ecto_job/pull/9) - [darksheik](https://github.com/darksheik) - Configurable job polling interval
+
 [#11](https://github.com/mbuhot/ecto_job/pull/9) - [darksheik](https://github.com/darksheik) - Configurable logging level
 
 # 0.1.1

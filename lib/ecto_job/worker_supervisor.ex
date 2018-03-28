@@ -4,18 +4,18 @@ defmodule EctoJob.WorkerSupervisor do
   """
 
   import Supervisor.Spec
-  alias EctoJob.Worker
+  alias EctoJob.{Config, Worker}
 
   @doc """
   Starts the ConsumerSupervisor
 
-   - `repo` : The Ecto.Repo module
+   - `config` : The JobQueue configuration, used for Repo, Logging options
    - `subscribe_opts` : Should contain [{producer_name, max_demand: max_demand}]
   """
-  @spec start_link(repo: module, subscribe_to: Keyword.t()) :: Supervisor.on_start()
-  def start_link(repo: repo, subscribe_to: subscribe_opts) do
+  @spec start_link(config: Config.t, subscribe_to: Keyword.t()) :: Supervisor.on_start()
+  def start_link(config: config, subscribe_to: subscribe_opts) do
     children = [
-      worker(Worker, [repo], restart: :temporary)
+      worker(Worker, [config], restart: :temporary)
     ]
 
     ConsumerSupervisor.start_link(children, strategy: :one_for_one, subscribe_to: subscribe_opts)

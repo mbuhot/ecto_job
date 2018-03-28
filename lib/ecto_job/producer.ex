@@ -24,15 +24,16 @@ defmodule EctoJob.Producer do
     @moduledoc """
     Internal state of the Producer GenStage
     """
-    @enforce_keys [:repo, :schema, :notifier, :demand, :clock]
-    defstruct [:repo, :schema, :notifier, :demand, :clock]
+    @enforce_keys [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
+    defstruct [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
 
     @type t :: %__MODULE__{
             repo: EctoJob.Producer.repo(),
             schema: EctoJob.Producer.schema(),
             notifier: EctoJob.Producer.notifier(),
             demand: integer,
-            clock: (() -> DateTime.t())
+            clock: (() -> DateTime.t()),
+            poll_interval: non_neg_integer()
           }
   end
 
@@ -42,9 +43,10 @@ defmodule EctoJob.Producer do
    - `repo` : The Ecto Repo module to user for querying
    - `schema` : The EctoJob.JobQueue module to query
    - `notifier` : The name of the `Postgrex.Notifications` notifier process
+   - `poll_interval` : Timer interval for activating scheduled/expired jobs
   """
-  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom) :: {:ok, pid}
-  def start_link(name: name, repo: repo, schema: schema, notifier: notifier) do
+  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom, poll_interval: non_neg_integer) :: {:ok, pid}
+  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval) do
     GenStage.start_link(
       __MODULE__,
       %State{
@@ -52,7 +54,8 @@ defmodule EctoJob.Producer do
         schema: schema,
         notifier: Process.whereis(notifier),
         demand: 0,
-        clock: &DateTime.utc_now/0
+        clock: &DateTime.utc_now/0,
+        poll_interval: poll_interval
       },
       name: name
     )
@@ -61,18 +64,17 @@ defmodule EctoJob.Producer do
   @doc """
   Starts the sweeper timer to activate scheduled/expired jobs and starts listening for new job notifications.
   """
-  @impl true
   @spec init(State.t()) :: {:producer, State.t()}
-  def init(state = %State{notifier: notifier, schema: schema}) do
-    _ = start_timer()
+  def init(state = %State{notifier: notifier, schema: schema, poll_interval: poll_interval}) do
+    _ = start_timer(poll_interval)
     _ = start_listener(notifier, schema)
     {:producer, state}
   end
 
   # Starts the sweeper timer to activate scheduled/expired jobs
-  @spec start_timer() :: {:ok, :timer.tref()}
-  defp start_timer do
-    {:ok, _ref} = :timer.send_interval(Application.get_env(:ecto_job, :poll_interval, 60_000), :poll)
+  @spec start_timer(non_neg_integer) :: {:ok, :timer.tref()}
+  defp start_timer(poll_interval) do
+    {:ok, _ref} = :timer.send_interval(poll_interval, :poll)
   end
 
   # Starts listening to notifications from postgrex for new jobs
@@ -89,7 +91,6 @@ defmodule EctoJob.Producer do
   `:poll` messages will attempt to activate jobs, and dispatch them according to current demand.
   `:notification` messages will dispatch any active jobs according to current demand.
   """
-  @impl true
   @spec handle_info(term, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
   def handle_info(_, state = %State{demand: 0}) do
     {:noreply, [], state}
@@ -113,7 +114,6 @@ defmodule EctoJob.Producer do
   @doc """
   Dispatch jobs according to the new demand plus any buffered demand.
   """
-  @impl true
   @spec handle_demand(integer, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
   def handle_demand(demand, state = %State{demand: buffered_demand, clock: clock}) do
     dispatch_jobs(%{state | demand: demand + buffered_demand}, clock.())

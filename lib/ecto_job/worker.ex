@@ -1,4 +1,5 @@
 defmodule EctoJob.Worker do
+  require IEx
   @moduledoc """
   Worker module responsible for executing a single Job
   """
@@ -22,7 +23,12 @@ defmodule EctoJob.Worker do
   def start_link(repo, job = %queue{}, now) do
     Task.start_link(fn ->
       with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now) do
-        queue.perform(JobQueue.initial_multi(job), job.params)
+        case queue.perform(JobQueue.initial_multi(job), job.params) do
+          {:ok, res} -> res
+          {:error, reason} -> JobQueue.update_error(repo, job, reason)
+          {:error, _ , message, changes_so_far} -> JobQueue.update_error(repo, extract_job(changes_so_far), message)
+          error -> raise "Unexpected return from job worker: #{error}"
+        end
         log_duration(job, now)
         notify_completed(repo, job)
       end
@@ -46,4 +52,13 @@ defmodule EctoJob.Worker do
     repo.query("SELECT pg_notify($1, $2)", [topic, payload])
     :ok
   end
+
+  # extract job from %{ :good_work => :nothing, "delete_job_9" 
+  # => %{ __meta__: "Ecto.Schema.Metadata<:deleted", attempt: 1,
+  defp extract_job(multi_response), do:
+     multi_response |> Map.to_list |> List.last |> elem(1)
+
 end
+
+
+

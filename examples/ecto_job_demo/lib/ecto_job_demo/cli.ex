@@ -10,7 +10,7 @@ defmodule EctoJobDemo.CLI do
 
   defp enqueue_jobs(n, "ecto_job") do
     Enum.each(1..n, fn i ->
-      {EctoJobDemo, :hello, [i]}
+      %{hello: i}
       |> EctoJobDemo.JobQueue.new()
       |> EctoJobDemo.Repo.insert!()
     end)

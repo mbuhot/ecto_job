@@ -60,7 +60,8 @@ defmodule EctoJob.JobQueue do
 
       @doc """
       Supervisor child_spec for use with Elixir 1.5+
-      See `start_link` for available options
+
+      See `EctoJob.Config` for available configuration options.
       """
       @spec child_spec(Keyword.t()) :: Supervisor.child_spec()
       def child_spec(opts) do
@@ -73,10 +74,17 @@ defmodule EctoJob.JobQueue do
 
       @doc """
       Start the JobQueue.Supervisor using the current module as the queue schema.
+
+      See `EctoJob.Config` for available configuration options.
+
+      ## Example
+
+          MyApp.JobQueue.start_link(repo: MyApp.Repo, max_demand: 25)
       """
-      @spec start_link(repo: EctoJob.JobQueue.repo(), max_demand: integer) :: {:ok, pid}
-      def start_link(repo: repo, max_demand: max_demand) do
-        EctoJob.Supervisor.start_link(repo: repo, schema: __MODULE__, max_demand: max_demand)
+      @spec start_link(Keyword.t()) :: {:ok, pid}
+      def start_link(opts) do
+        config = EctoJob.Config.new(opts)
+        EctoJob.Supervisor.start_link(%{config | schema: __MODULE__})
       end
 
       @doc """

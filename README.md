@@ -152,12 +152,14 @@ You can customize how often the table is polled for scheduled jobs.  The default
 config :ecto_job, :poll_interval, 15_000
 ```
 
-You can control whether logs are on or off and the log level.  The default is true and info.
+You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
 ```
 config :ecto_job, log: true,
                   log_level: :debug
 ```
+
+See `EctoJob.Config` for configuration details.
 
 ## How it works
 

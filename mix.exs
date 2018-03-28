@@ -11,6 +11,7 @@ defmodule EctoJob.Mixfile do
       version: @version,
       elixir: "~> 1.5",
       elixirc_paths: elixirc_paths(Mix.env()),
+      elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: dialyzer(),
@@ -48,6 +49,7 @@ defmodule EctoJob.Mixfile do
   defp docs do
     [
       extras: ["README.md"],
+      main: "readme",
       source_ref: "v#{@version}",
       source_url: @url,
       homepage_url: @url

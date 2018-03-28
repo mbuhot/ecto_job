@@ -27,17 +27,13 @@ defmodule EctoJob.Supervisor do
   """
 
   import Supervisor.Spec, only: [worker: 2, supervisor: 2]
-  alias EctoJob.{Producer, WorkerSupervisor}
+  alias EctoJob.{Producer, WorkerSupervisor, Config}
 
   @doc """
   Starts an EctoJob queue supervisor
-
-   - `repo`       : Ecto Repo module
-   - `schema`     : EctoJob.JobQueue Module for the schema representing the queue
-   - `max_demand` : Sets the maximum concurrency for job workers
   """
-  @spec start_link(repo: module, schema: module, max_demand: integer) :: {:ok, pid}
-  def start_link(repo: repo, schema: schema, max_demand: max_demand) do
+  @spec start_link(Config.t) :: {:ok, pid}
+  def start_link(config = %Config{repo: repo, schema: schema, max_demand: max_demand, poll_interval: poll_interval}) do
     supervisor_name = String.to_atom("#{schema}.Supervisor")
     notifier_name = String.to_atom("#{schema}.Notifier")
     producer_name = String.to_atom("#{schema}.Producer")
@@ -45,10 +41,10 @@ defmodule EctoJob.Supervisor do
     children = [
       worker(Postgrex.Notifications, [repo.config() ++ [name: notifier_name]]),
       worker(Producer, [
-        [name: producer_name, repo: repo, schema: schema, notifier: notifier_name]
+        [name: producer_name, repo: repo, schema: schema, notifier: notifier_name, poll_interval: poll_interval]
       ]),
       supervisor(WorkerSupervisor, [
-        [repo: repo, subscribe_to: [{producer_name, max_demand: max_demand}]]
+        [config: config, subscribe_to: [{producer_name, max_demand: max_demand}]]
       ])
     ]
 

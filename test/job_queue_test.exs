@@ -1,4 +1,6 @@
 defmodule EctoJob.JobQueueTest do
+  # credo:disable-for-this-file
+
   use ExUnit.Case, async: true
   alias EctoJob.Test.Repo
   require Ecto.Query, as: Query

@@ -18,19 +18,30 @@ defmodule EctoJob.JobQueue do
 
   @type repo :: module
   @type schema :: module
+
+  @typedoc """
+  Job State enumeration
+
+   - `"SCHEDULED"`: The job is scheduled to run at a future time
+   - `"AVAILABLE"`: The job is availble to be run by the next available worker
+   - `"RESERVED"`: The job has been reserved by a worker for execution
+   - `"IN_PROGRESS"`: The job is currently being worked
+   - `"FAILED"`: The job has exceeded the `max_attempts` and will not be retried again
+  """
   @type state :: String.t()
+
   @type job :: %{
-          __struct__: :atom,
-          id: integer,
+          __struct__: module,
+          id: integer | nil,
           state: state,
           expires: DateTime.t() | nil,
-          schedule: DateTime.t(),
-          attempt: integer,
-          max_attempts: integer,
-          params: map,
+          schedule: DateTime.t() | nil,
+          attempt: integer(),
+          max_attempts: integer | nil,
+          params: map(),
           notify: String.t() | nil,
-          updated_at: DateTime.t(),
-          inserted_at: DateTime.t()
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
         }
 
   @callback perform(Multi.t(), map) :: term
@@ -122,7 +133,7 @@ defmodule EctoJob.JobQueue do
           |> MyApp.Repo.transaction()
       """
       @spec enqueue(Multi.t(), term, map, Keyword.t()) :: Multi.t()
-      def enqueue(multi = %Multi{}, name, params, opts \\ []) do
+      def enqueue(multi, name, params, opts \\ []) do
         Multi.insert(multi, name, new(params, opts))
       end
     end

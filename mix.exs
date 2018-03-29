@@ -1,7 +1,7 @@
 defmodule EctoJob.Mixfile do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @url "https://github.com/mbuhot/ecto_job"
 
   def project do

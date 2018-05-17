@@ -152,6 +152,12 @@ You can customize how often the table is polled for scheduled jobs.  The default
 config :ecto_job, :poll_interval, 15_000
 ```
 
+Control both the time period the job is reserved by a waiting worker before it's started and the base retry interval for failed/timed out jobs. Keep in mind, for jobs that are expected to retry quickly, any configured `base_expiry_seconds` will only retry a job as quickly as the `poll_interval`. An exception to this may be the first retry, which may not be bounded similarly if the initial job trigger dispatches the first attempt mid-interval.
+
+```
+config :ecto_job, :base_expiry_seconds, 60
+```
+
 You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
 ```

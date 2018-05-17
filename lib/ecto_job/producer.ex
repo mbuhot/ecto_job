@@ -24,8 +24,8 @@ defmodule EctoJob.Producer do
     @moduledoc """
     Internal state of the Producer GenStage
     """
-    @enforce_keys [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
-    defstruct [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
+    @enforce_keys [:repo, :schema, :notifier, :demand, :clock, :poll_interval, :base_expiry_seconds]
+    defstruct [:repo, :schema, :notifier, :demand, :clock, :poll_interval, :base_expiry_seconds]
 
     @type t :: %__MODULE__{
             repo: EctoJob.Producer.repo(),
@@ -33,7 +33,8 @@ defmodule EctoJob.Producer do
             notifier: EctoJob.Producer.notifier(),
             demand: integer,
             clock: (() -> DateTime.t()),
-            poll_interval: non_neg_integer()
+            poll_interval: non_neg_integer(),
+            base_expiry_seconds: non_neg_integer()
           }
   end
 
@@ -46,7 +47,7 @@ defmodule EctoJob.Producer do
    - `poll_interval` : Timer interval for activating scheduled/expired jobs
   """
   @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom, poll_interval: non_neg_integer) :: {:ok, pid}
-  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval) do
+  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval, base_expiry_seconds: base_expiry_seconds) do
     GenStage.start_link(
       __MODULE__,
       %State{
@@ -55,7 +56,8 @@ defmodule EctoJob.Producer do
         notifier: Process.whereis(notifier),
         demand: 0,
         clock: &DateTime.utc_now/0,
-        poll_interval: poll_interval
+        poll_interval: poll_interval,
+        base_expiry_seconds: base_expiry_seconds
       },
       name: name
     )
@@ -128,8 +130,9 @@ defmodule EctoJob.Producer do
 
   # Reserve jobs according to demand, and construct the GenState reply tuple
   @spec dispatch_jobs(State.t(), DateTime.t()) :: {:noreply, [JobQueue.job()], State.t()}
-  defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}, now) do
-    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now)
+  defp dispatch_jobs(state = %State{}, now) do
+    %{repo: repo, schema: schema, demand: demand, base_expiry_seconds: base_expiry} = state
+    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now, base_expiry)
     {:noreply, jobs, %{state | demand: demand - count}}
   end
 end

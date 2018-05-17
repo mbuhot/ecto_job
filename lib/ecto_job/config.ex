@@ -22,6 +22,7 @@ defmodule EctoJob.Config do
     - `log`: (Default `true`) Enables logging using the standard Elixir `Logger` module
     - `log_level`: (Default `:info`) The level used to log messages, see [Logger](https://hexdocs.pm/logger/Logger.html#module-levels)
     - `poll_interval`: (Default `60_000`) Time in milliseconds between polling the `JobQueue` for scheduled jobs or jobs due to be retried
+    - `base_expiry_seconds`: (Default `300`) Time in seconds where a `RESERVED` or `IN_PROGRESS` job state is held before subsequent polls return a job to the `AVAILABLE` state for retry. The time will double for every retry until `max_attemps` is reached for a given job.
   """
 
   alias __MODULE__
@@ -31,7 +32,8 @@ defmodule EctoJob.Config do
             max_demand: 100,
             log: true,
             log_level: :info,
-            poll_interval: 60_000
+            poll_interval: 60_000,
+            base_expiry_seconds: 300
 
   @type t :: %Config{}
 
@@ -46,7 +48,8 @@ defmodule EctoJob.Config do
         max_demand: 100,
         log: false,
         log_level: :info,
-        poll_interval: 60_000
+        poll_interval: 60_000,
+        base_expiry_seconds: 300
       }
   """
   @spec new(Keyword.t()) :: Config.t()

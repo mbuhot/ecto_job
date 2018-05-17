@@ -224,11 +224,11 @@ defmodule EctoJob.JobQueue do
   The batch size is determined by `demand`.
   returns `{count, updated_jobs}` tuple.
   """
-  @spec reserve_available_jobs(repo, schema, integer, DateTime.t()) :: {integer, [job]}
-  def reserve_available_jobs(repo, schema, demand, now = %DateTime{}) do
+  @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
+  def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, base_expiry \\ 300) do
     repo.update_all(
       available_jobs(schema, demand),
-      [set: [state: "RESERVED", expires: reservation_expiry(now), updated_at: now]],
+      [set: [state: "RESERVED", expires: reservation_expiry(now, base_expiry), updated_at: now]],
       returning: true
     )
   end
@@ -256,12 +256,15 @@ defmodule EctoJob.JobQueue do
 
   @doc """
   Computes the expiry time for a job reservation to be held, given the current time.
+
+  Note that the integer value represents seconds to conform with unix timestamp values,
+  not milliseconds
   """
-  @spec reservation_expiry(DateTime.t()) :: DateTime.t()
-  def reservation_expiry(now = %DateTime{}) do
+  @spec reservation_expiry(DateTime.t(), integer) :: DateTime.t()
+  def reservation_expiry(now = %DateTime{}, base_expiry_seconds \\ 300) do
     now
     |> DateTime.to_unix()
-    |> Kernel.+(300)
+    |> Kernel.+(base_expiry_seconds)
     |> DateTime.from_unix!()
   end
 
@@ -275,12 +278,13 @@ defmodule EctoJob.JobQueue do
    - The expiry time is in the future
 
   Updates the state to `"IN_PROGRESS"`, increments the attempt counter, and sets an
-  expiry time, proportional to the attempt counter.
+  expiry time, proportional to the attempt counter and the base expiry, which defaults to
+  300s (5 minutes) unless otherwise configured.
 
   Returns `{:ok, job}` when sucessful, `{:error, :expired}` otherwise.
   """
-  @spec update_job_in_progress(repo, job, DateTime.t()) :: {:ok, job} | {:error, :expired}
-  def update_job_in_progress(repo, job = %schema{}, now) do
+  @spec update_job_in_progress(repo, job, DateTime.t(), integer) :: {:ok, job} | {:error, :expired}
+  def update_job_in_progress(repo, job = %schema{}, now, base_expiry_seconds \\ 300) do
     {count, results} =
       repo.update_all(
         Query.from(
@@ -294,7 +298,7 @@ defmodule EctoJob.JobQueue do
           set: [
             attempt: job.attempt + 1,
             state: "IN_PROGRESS",
-            expires: progress_expiry(now, job.attempt + 1),
+            expires: progress_expiry(now, job.attempt + 1, base_expiry_seconds),
             updated_at: now
           ]
         ],
@@ -309,12 +313,15 @@ defmodule EctoJob.JobQueue do
 
   @doc """
   Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter
+
+  Note that the integer value represents seconds to conform with unix timestamp values,
+  not milliseconds
   """
   @spec progress_expiry(DateTime.t(), integer) :: DateTime.t()
-  def progress_expiry(now, attempt) do
+  def progress_expiry(now, attempt, base_expiry_seconds \\ 300) do
     now
     |> DateTime.to_unix()
-    |> Kernel.+(300 * attempt)
+    |> Kernel.+(base_expiry_seconds * attempt)
     |> DateTime.from_unix!()
   end
 

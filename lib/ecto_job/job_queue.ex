@@ -219,16 +219,16 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates a batch of jobs in `"AVAILABLE"` state to `"RESERVED"` state with an expiry.
+  Updates a batch of jobs in `"AVAILABLE"` state to `"RESERVED"` state with a timeout.
 
   The batch size is determined by `demand`.
   returns `{count, updated_jobs}` tuple.
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
-  def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, base_expiry \\ 300) do
+  def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
     repo.update_all(
       available_jobs(schema, demand),
-      [set: [state: "RESERVED", expires: reservation_expiry(now, base_expiry), updated_at: now]],
+      [set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]],
       returning: true
     )
   end
@@ -256,16 +256,10 @@ defmodule EctoJob.JobQueue do
 
   @doc """
   Computes the expiry time for a job reservation to be held, given the current time.
-
-  Note that the integer value represents seconds to conform with unix timestamp values,
-  not milliseconds
   """
   @spec reservation_expiry(DateTime.t(), integer) :: DateTime.t()
-  def reservation_expiry(now = %DateTime{}, base_expiry_seconds \\ 300) do
-    now
-    |> DateTime.to_unix()
-    |> Kernel.+(base_expiry_seconds)
-    |> DateTime.from_unix!()
+  def reservation_expiry(now = %DateTime{}, timeout_ms) do
+    timeout_ms |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 
   @doc """
@@ -277,14 +271,14 @@ defmodule EctoJob.JobQueue do
    - The state is still `"RESERVED"`
    - The expiry time is in the future
 
-  Updates the state to `"IN_PROGRESS"`, increments the attempt counter, and sets an
-  expiry time, proportional to the attempt counter and the base expiry, which defaults to
-  300s (5 minutes) unless otherwise configured.
+  Updates the state to `"IN_PROGRESS"`, increments the attempt counter, and sets a
+  timeout proportional to the attempt counter and the expiry_timeout, which defaults to
+  300_000 ms (5 minutes) unless otherwise configured.
 
   Returns `{:ok, job}` when sucessful, `{:error, :expired}` otherwise.
   """
   @spec update_job_in_progress(repo, job, DateTime.t(), integer) :: {:ok, job} | {:error, :expired}
-  def update_job_in_progress(repo, job = %schema{}, now, base_expiry_seconds \\ 300) do
+  def update_job_in_progress(repo, job = %schema{}, now, timeout_ms) do
     {count, results} =
       repo.update_all(
         Query.from(
@@ -298,7 +292,7 @@ defmodule EctoJob.JobQueue do
           set: [
             attempt: job.attempt + 1,
             state: "IN_PROGRESS",
-            expires: progress_expiry(now, job.attempt + 1, base_expiry_seconds),
+            expires: progress_expiry(now, job.attempt + 1, timeout_ms),
             updated_at: now
           ]
         ],
@@ -312,17 +306,11 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter
-
-  Note that the integer value represents seconds to conform with unix timestamp values,
-  not milliseconds
+  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter.
   """
-  @spec progress_expiry(DateTime.t(), integer) :: DateTime.t()
-  def progress_expiry(now, attempt, base_expiry_seconds \\ 300) do
-    now
-    |> DateTime.to_unix()
-    |> Kernel.+(base_expiry_seconds * attempt)
-    |> DateTime.from_unix!()
+  @spec progress_expiry(DateTime.t(), integer, integer) :: DateTime.t()
+  def progress_expiry(now = %DateTime{}, attempt, timeout_ms) do
+    timeout_ms |> Kernel.*(attempt) |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 
   @doc """
@@ -337,13 +325,19 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Creates an `Ecto.Changeset` that will delete a job, confirming that the attempt counter hasn't been
-  increased by another worker process.
+  Creates an `Ecto.Changeset` that will delete a job, confirming that the attempt counter hasn't been increased by another worker process.
   """
   @spec delete_job_changeset(job) :: Changeset.t()
   def delete_job_changeset(job) do
     job
     |> Changeset.change()
     |> Changeset.optimistic_lock(:attempt)
+  end
+
+  defp advance_seconds(seconds, start_time) do
+    start_time
+    |> DateTime.to_unix()
+    |> Kernel.+(seconds)
+    |> DateTime.from_unix!()
   end
 end

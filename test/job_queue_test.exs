@@ -9,6 +9,8 @@ defmodule EctoJob.JobQueueTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
   end
 
+  @default_timeout 300_000
+
   describe "JobQueue __using__ macro" do
     test "table_name is schema source" do
       assert EctoJob.Test.JobQueue.__schema__(:source) == "jobs"
@@ -205,8 +207,8 @@ defmodule EctoJob.JobQueueTest do
         )
       end
 
-      {3, [a, b, c]} = reserve_jobs.(3, 300)
-      {1, [d]} = reserve_jobs.(1, 120)
+      {3, [a, b, c]} = reserve_jobs.(3, 300_000)
+      {1, [d]} = reserve_jobs.(1, 120_000)
 
       assert DateTime.compare(a.schedule, b.schedule) == :lt
       assert DateTime.compare(b.schedule, c.schedule) == :lt
@@ -239,7 +241,7 @@ defmodule EctoJob.JobQueueTest do
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
 
-      {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now)
+      {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, @default_timeout)
 
       assert new_job.state == "IN_PROGRESS"
       assert new_job.attempt == 1
@@ -247,12 +249,12 @@ defmodule EctoJob.JobQueueTest do
       assert Repo.all(Query.from(EctoJob.Test.JobQueue, where: [state: "RESERVED"])) == []
     end
 
-    test "Uses product of configurable base expiry and next attempt to set expiry" do
+    test "Uses product of configurable execution timeout and next attempt to set expiry" do
       expiry = DateTime.from_naive!(~N[2017-08-17T12:29:34.0Z], "Etc/UTC")
       now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
 
       attempt = 2
-      base_expiry = 600
+      timeout = 600_000
 
       job =
         EctoJob.Test.JobQueue.new(%{})
@@ -261,9 +263,10 @@ defmodule EctoJob.JobQueueTest do
         |> Map.put(:attempt, attempt)
         |> Repo.insert!()
 
-      {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, base_expiry)
+      {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, timeout)
 
-      assert DateTime.diff(new_job.expires, now, :seconds) == base_expiry * (attempt + 1)
+      assert DateTime.diff(new_job.expires, now, :seconds) ==
+        Integer.floor_div(timeout * (attempt + 1), 1000)
     end
 
     test "Does not update if reservation expired" do
@@ -276,7 +279,7 @@ defmodule EctoJob.JobQueueTest do
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
 
-      {:error, :expired} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now)
+      {:error, :expired} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, @default_timeout)
     end
 
     test "Does not update if attempt changed" do
@@ -290,7 +293,8 @@ defmodule EctoJob.JobQueueTest do
         |> Map.put(:attempt, 3)
         |> Repo.insert!()
 
-      {:error, :expired} = EctoJob.JobQueue.update_job_in_progress(Repo, %{job | attempt: 2}, now)
+      {:error, :expired} =
+        EctoJob.JobQueue.update_job_in_progress(Repo, %{job | attempt: 2}, now, @default_timeout)
     end
 
     test "Does not update if state changed" do
@@ -305,7 +309,12 @@ defmodule EctoJob.JobQueueTest do
         |> Repo.insert!()
 
       {:error, :expired} =
-        EctoJob.JobQueue.update_job_in_progress(Repo, %{job | state: "RESERVED"}, now)
+        EctoJob.JobQueue.update_job_in_progress(
+          Repo,
+          %{job | state: "RESERVED"},
+          now,
+          @default_timeout
+        )
     end
   end
 end

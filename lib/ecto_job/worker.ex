@@ -19,9 +19,9 @@ defmodule EctoJob.Worker do
   reactivated by the producer.
   """
   @spec start_link(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: {:ok, pid}
-  def start_link(config = %Config{repo: repo, base_expiry_seconds: base_expiry}, job = %queue{}, now) do
+  def start_link(config = %Config{repo: repo, execution_timeout: timeout}, job = %queue{}, now) do
     Task.start_link(fn ->
-      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now, base_expiry) do
+      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now, timeout) do
         queue.perform(JobQueue.initial_multi(job), job.params)
         log_duration(config, job, now)
         notify_completed(repo, job)

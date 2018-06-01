@@ -13,7 +13,9 @@ defmodule EctoJob.ProducerTest do
         notifier: nil,
         demand: 0,
         clock: fn -> DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC") end,
-        poll_interval: 60_000
+        poll_interval: 60_000,
+        reservation_timeout: 60_000,
+        execution_timeout: 300_000,
       }
     }
   end

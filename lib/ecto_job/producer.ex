@@ -19,13 +19,34 @@ defmodule EctoJob.Producer do
   @type repo :: module
   @type schema :: module
   @type notifier :: pid
+  @type timeout_ms :: non_neg_integer
 
   defmodule State do
     @moduledoc """
     Internal state of the Producer GenStage
     """
-    @enforce_keys [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
-    defstruct [:repo, :schema, :notifier, :demand, :clock, :poll_interval]
+
+    @enforce_keys [
+      :repo,
+      :schema,
+      :notifier,
+      :demand,
+      :clock,
+      :poll_interval,
+      :reservation_timeout,
+      :execution_timeout
+    ]
+
+    defstruct [
+      :repo,
+      :schema,
+      :notifier,
+      :demand,
+      :clock,
+      :poll_interval,
+      :reservation_timeout,
+      :execution_timeout
+    ]
 
     @type t :: %__MODULE__{
             repo: EctoJob.Producer.repo(),
@@ -33,7 +54,9 @@ defmodule EctoJob.Producer do
             notifier: EctoJob.Producer.notifier(),
             demand: integer,
             clock: (() -> DateTime.t()),
-            poll_interval: non_neg_integer()
+            poll_interval: non_neg_integer(),
+            reservation_timeout: EctoJob.Producer.timeout_ms(),
+            execution_timeout: EctoJob.Producer.timeout_ms()
           }
   end
 
@@ -45,8 +68,8 @@ defmodule EctoJob.Producer do
    - `notifier` : The name of the `Postgrex.Notifications` notifier process
    - `poll_interval` : Timer interval for activating scheduled/expired jobs
   """
-  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom, poll_interval: non_neg_integer) :: {:ok, pid}
-  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval) do
+  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom, poll_interval: non_neg_integer, reservation_timeout: timeout_ms(), execution_timeout: timeout_ms()) :: {:ok, pid}
+  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval, reservation_timeout: reservation_timeout, execution_timeout: execution_timeout) do
     GenStage.start_link(
       __MODULE__,
       %State{
@@ -55,7 +78,9 @@ defmodule EctoJob.Producer do
         notifier: Process.whereis(notifier),
         demand: 0,
         clock: &DateTime.utc_now/0,
-        poll_interval: poll_interval
+        poll_interval: poll_interval,
+        reservation_timeout: reservation_timeout,
+        execution_timeout: execution_timeout
       },
       name: name
     )
@@ -128,8 +153,9 @@ defmodule EctoJob.Producer do
 
   # Reserve jobs according to demand, and construct the GenState reply tuple
   @spec dispatch_jobs(State.t(), DateTime.t()) :: {:noreply, [JobQueue.job()], State.t()}
-  defp dispatch_jobs(state = %State{repo: repo, schema: schema, demand: demand}, now) do
-    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now)
+  defp dispatch_jobs(state = %State{}, now) do
+    %{repo: repo, schema: schema, demand: demand, reservation_timeout: timeout} = state
+    {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now, timeout)
     {:noreply, jobs, %{state | demand: demand - count}}
   end
 end

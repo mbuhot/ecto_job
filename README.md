@@ -152,6 +152,18 @@ You can customize how often the table is polled for scheduled jobs.  The default
 config :ecto_job, :poll_interval, 15_000
 ```
 
+Control the time for which the job is reserved while waiting for a worker to pick it up, before the poller will make the job available again for dispatch by the producer.  The default is `60_000` ms.
+
+```
+config :ecto_job, :reservation_timeout, 15_000
+```
+
+Control the timeout for job execution before a job will be made available for retry. Begins when job is picked up by worker. Keep in mind, for jobs that are expected to retry quickly, any configured `execution_timout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
+
+```
+config :ecto_job, :execution_timeout, 300_000
+```
+
 You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
 ```
@@ -190,15 +202,23 @@ Scheduled jobs transition to "AVAILABLE" after the scheduled time has passed.
 
 Jobs that are intended to run immediately start in an "AVAILABLE" state.
 
-The producer will update a batch of jobs setting the state to "RESERVED", with an expiry of 5 minutes.
+The producer will update a batch of jobs setting the state to "RESERVED", with an expiry of 5 minutes unless otherwise configured.
 
-Once a consumer is given a job, it increments the attempt counter and updates the state to "IN_PROGRESS", with an expiry of 5 minutes.
-If the job is being retried, the expiry will be 5 minutes * the attempt counter.
+Once a consumer is given a job, it increments the attempt counter and updates the state to "IN_PROGRESS", with an initial timeout configurable as `execution_timeout`, defaulting to 5 minutes.
+If the job is being retried, the expiry will be initial timeout * the attempt counter.
 
-If successful, the consumer will delete the job from the queue.
-If unsuccessful, the job remains in the "IN_PROGRESS" state until it expires.
+If successful, the consumer can delete the job from the queue using the preloaded multi passed to the `perform/2` job handler.
+If an exception is raised in the worker or a successful processing attempt fails to successfully commit the preloaded multi, the job is not deleted and remains in the "IN_PROGRESS" state until it expires.
 
 Jobs in the "RESERVED" or "IN_PROGRESS" state past the expiry time will be returned to the "AVAILABLE" state.
 
 Expired jobs in the "IN_PROGRESS" state with attempts >= MAX_ATTEMPTS move to a "FAILED" state.
 Failed jobs are kept in the database so that application developers can handle the failure.
+
+## Job Timeouts and Transactional Safety
+
+When performing long-running jobs or when configuring a short execution timout, keep in mind that a job may be retried before it has finished and the retry has no proactive mechanism to cancel the running job.
+
+In the case that the initial job attempts to finish and commit a result, and the commit includes the preloaded multi passed as the first parameter to `perform/2`, the optimistic lock will fail the transaction.
+
+In the case where the job performs other side effects outside of the transaction such as calls to external APIs or additional database writes, these are suggested to implement other idempotency guarantees, as they will not be rolled back in a failed or duplicated job.

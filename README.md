@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 0.2"}
+  {:ecto_job, "~> 0.3"}
 ```
 
 ## Installation
@@ -72,15 +72,15 @@ defmodule MyApp.JobQueue do
 end
 ```
 
-Add your new `JobQueue` module as a supervisor to the application supervision tree to run the worker supervisor:
+Add your new `JobQueue` module to the application supervision tree to run the worker supervisor:
 
 ```elixir
 def start(_type, _args) do
   import Supervisor.Spec
 
   children = [
-    supervisor(MyApp.Repo, []),
-    supervisor(MyApp.JobQueue, [[repo: MyApp.Repo, max_demand: 100]])
+    MyApp.Repo,
+    {MyApp.JobQueue, repo: MyApp.Repo, max_demand: 100}
   ]
 
   opts = [strategy: :one_for_one, name: MyApp.Supervisor]

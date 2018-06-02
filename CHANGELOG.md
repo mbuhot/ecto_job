@@ -1,3 +1,9 @@
+# 0.3.0
+
+[#17](https://github.com/mbuhot/ecto_job/pull/17) - [mmartinson](https://github.com/mmartinson) - Make base expiry configurable
+
+Adds configuration options for `execution_timeout` and `reservation_timeout`.
+
 # 0.2.1
 
 [#14](https://github.com/mbuhot/ecto_job/pull/14) - [mbuhot](https://github.com/mbuhot) - Improve configuration flexibility

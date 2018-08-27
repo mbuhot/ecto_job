@@ -19,4 +19,6 @@ if Mix.env() == :test do
 
   config :logger, level: :warn
 
+  config :ecto_job,
+    always_dispatch_jobs_on_poll: System.get_env("ALWAYS_DISPATCH_JOBS_ON_POLL") || "false"
 end

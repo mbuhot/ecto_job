@@ -15,7 +15,7 @@ defmodule EctoJob.ProducerTest do
         clock: fn -> DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC") end,
         poll_interval: 60_000,
         reservation_timeout: 60_000,
-        execution_timeout: 300_000,
+        execution_timeout: 300_000
       }
     }
   end
@@ -32,6 +32,23 @@ defmodule EctoJob.ProducerTest do
 
       assert {:noreply, [%JobQueue{}], %{demand: 9}} =
                Producer.handle_info(:poll, %{state | demand: 10})
+    end
+
+    test "When always_dispatch_jobs_on_poll is true", %{state: state} do
+      Application.put_env(:ecto_job, :always_dispatch_jobs_on_poll, "true")
+
+      Repo.insert!(JobQueue.new(%{}))
+
+      assert {:noreply, [%JobQueue{}], %{demand: 9}} =
+               Producer.handle_info(:poll, %{state | demand: 10})
+    end
+
+    test "When always_dispatch_jobs_on_poll is false", %{state: state} do
+      Application.put_env(:ecto_job, :always_dispatch_jobs_on_poll, "false")
+
+      Repo.insert!(JobQueue.new(%{}))
+
+      assert {:noreply, [], %{demand: 10}} = Producer.handle_info(:poll, %{state | demand: 10})
     end
   end
 

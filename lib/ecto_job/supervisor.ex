@@ -32,8 +32,18 @@ defmodule EctoJob.Supervisor do
   @doc """
   Starts an EctoJob queue supervisor
   """
-  @spec start_link(Config.t) :: {:ok, pid}
-  def start_link(config = %Config{repo: repo, schema: schema, max_demand: max_demand, poll_interval: poll_interval, reservation_timeout: reservation_timeout, execution_timeout: execution_timeout}) do
+  @spec start_link(Config.t()) :: {:ok, pid}
+  def start_link(
+        config = %Config{
+          repo: repo,
+          schema: schema,
+          max_demand: max_demand,
+          poll_interval: poll_interval,
+          reservation_timeout: reservation_timeout,
+          execution_timeout: execution_timeout,
+          always_dispatch_jobs_on_poll: always_dispatch_jobs_on_poll
+        }
+      ) do
     supervisor_name = String.to_atom("#{schema}.Supervisor")
     notifier_name = String.to_atom("#{schema}.Notifier")
     producer_name = String.to_atom("#{schema}.Producer")
@@ -41,7 +51,16 @@ defmodule EctoJob.Supervisor do
     children = [
       worker(Postgrex.Notifications, [repo.config() ++ [name: notifier_name]]),
       worker(Producer, [
-        [name: producer_name, repo: repo, schema: schema, notifier: notifier_name, poll_interval: poll_interval, reservation_timeout: reservation_timeout, execution_timeout: execution_timeout]
+        [
+          name: producer_name,
+          repo: repo,
+          schema: schema,
+          notifier: notifier_name,
+          poll_interval: poll_interval,
+          reservation_timeout: reservation_timeout,
+          execution_timeout: execution_timeout,
+          always_dispatch_jobs_on_poll: always_dispatch_jobs_on_poll
+        ]
       ]),
       supervisor(WorkerSupervisor, [
         [config: config, subscribe_to: [{producer_name, max_demand: max_demand}]]

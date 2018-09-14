@@ -18,5 +18,4 @@ if Mix.env() == :test do
   config :ecto_job, ecto_repos: [EctoJob.Test.Repo]
 
   config :logger, level: :warn
-
 end

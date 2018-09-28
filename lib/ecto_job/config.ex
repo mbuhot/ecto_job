@@ -24,6 +24,7 @@ defmodule EctoJob.Config do
     - `poll_interval`: (Default `60_000`) Time in milliseconds between polling the `JobQueue` for scheduled jobs or jobs due to be retried
     - `reservation_timeout`: (Default `60_000`) Time in ms during which a `RESERVED` job state is held while waiting for a worker to start the job. Subsequent polls will return the job to the `AVAILABLE` state for retry.
     - `execution_timeout`: (Default `300_000`) Time in ms that a worker is allotted to hold a job in the `IN_PROGRESS` state before subsequent polls return a job to the `AVAILABLE` state for retry. The timeout is extended by `execution_timeout` for every retry attempt until `max_attemps` is reached for a given job.
+    - `notifications_listen_timeout`: (Default `5_000`) Time in milliseconds that Notifications.listen!/3 is alloted to start listening to notifications from postgrex for new jobs
   """
 
   alias __MODULE__
@@ -35,7 +36,8 @@ defmodule EctoJob.Config do
             log_level: :info,
             poll_interval: 60_000,
             reservation_timeout: 60_000,
-            execution_timeout: 300_000
+            execution_timeout: 300_000,
+            notifications_listen_timeout: 5_000
 
   @type t :: %Config{}
 
@@ -52,7 +54,8 @@ defmodule EctoJob.Config do
         log_level: :info,
         poll_interval: 60_000,
         reservation_timeout: 60_000,
-        execution_timeout: 300_000
+        execution_timeout: 300_000,
+        notifications_listen_timeout: 5_000
       }
   """
   @spec new(Keyword.t()) :: Config.t()

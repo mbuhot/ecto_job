@@ -16,6 +16,7 @@ defmodule EctoJob.ProducerTest do
         poll_interval: 60_000,
         reservation_timeout: 60_000,
         execution_timeout: 300_000,
+        notifications_listen_timeout: 5_000
       }
     }
   end

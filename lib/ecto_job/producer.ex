@@ -34,7 +34,8 @@ defmodule EctoJob.Producer do
       :clock,
       :poll_interval,
       :reservation_timeout,
-      :execution_timeout
+      :execution_timeout,
+      :notifications_listen_timeout
     ]
 
     defstruct [
@@ -45,7 +46,8 @@ defmodule EctoJob.Producer do
       :clock,
       :poll_interval,
       :reservation_timeout,
-      :execution_timeout
+      :execution_timeout,
+      :notifications_listen_timeout
     ]
 
     @type t :: %__MODULE__{
@@ -56,7 +58,8 @@ defmodule EctoJob.Producer do
             clock: (() -> DateTime.t()),
             poll_interval: non_neg_integer(),
             reservation_timeout: EctoJob.Producer.timeout_ms(),
-            execution_timeout: EctoJob.Producer.timeout_ms()
+            execution_timeout: EctoJob.Producer.timeout_ms(),
+            notifications_listen_timeout: EctoJob.Producer.timeout_ms()
           }
   end
 
@@ -67,9 +70,28 @@ defmodule EctoJob.Producer do
    - `schema` : The EctoJob.JobQueue module to query
    - `notifier` : The name of the `Postgrex.Notifications` notifier process
    - `poll_interval` : Timer interval for activating scheduled/expired jobs
+   - `notifications_listen_timeout`: Time in milliseconds that Notifications.listen!/3 is alloted to start listening to notifications from postgrex for new jobs
   """
-  @spec start_link(name: atom, repo: repo, schema: schema, notifier: atom, poll_interval: non_neg_integer, reservation_timeout: timeout_ms(), execution_timeout: timeout_ms()) :: {:ok, pid}
-  def start_link(name: name, repo: repo, schema: schema, notifier: notifier, poll_interval: poll_interval, reservation_timeout: reservation_timeout, execution_timeout: execution_timeout) do
+  @spec start_link(
+          name: atom,
+          repo: repo,
+          schema: schema,
+          notifier: atom,
+          poll_interval: non_neg_integer,
+          reservation_timeout: timeout_ms(),
+          execution_timeout: timeout_ms(),
+          notifications_listen_timeout: timeout_ms()
+        ) :: {:ok, pid}
+  def start_link(
+        name: name,
+        repo: repo,
+        schema: schema,
+        notifier: notifier,
+        poll_interval: poll_interval,
+        reservation_timeout: reservation_timeout,
+        execution_timeout: execution_timeout,
+        notifications_listen_timeout: notifications_listen_timeout
+      ) do
     GenStage.start_link(
       __MODULE__,
       %State{
@@ -80,7 +102,8 @@ defmodule EctoJob.Producer do
         clock: &DateTime.utc_now/0,
         poll_interval: poll_interval,
         reservation_timeout: reservation_timeout,
-        execution_timeout: execution_timeout
+        execution_timeout: execution_timeout,
+        notifications_listen_timeout: notifications_listen_timeout
       },
       name: name
     )
@@ -90,9 +113,16 @@ defmodule EctoJob.Producer do
   Starts the sweeper timer to activate scheduled/expired jobs and starts listening for new job notifications.
   """
   @spec init(State.t()) :: {:producer, State.t()}
-  def init(state = %State{notifier: notifier, schema: schema, poll_interval: poll_interval}) do
+  def init(
+        state = %State{
+          notifier: notifier,
+          schema: schema,
+          poll_interval: poll_interval,
+          notifications_listen_timeout: notifications_listen_timeout
+        }
+      ) do
     _ = start_timer(poll_interval)
-    _ = start_listener(notifier, schema)
+    _ = start_listener(notifier, schema, notifications_listen_timeout)
     {:producer, state}
   end
 
@@ -103,10 +133,10 @@ defmodule EctoJob.Producer do
   end
 
   # Starts listening to notifications from postgrex for new jobs
-  @spec start_listener(notifier, schema) :: reference
-  defp start_listener(notifier, schema) do
+  @spec start_listener(notifier, schema, timeout_ms) :: reference
+  defp start_listener(notifier, schema, notifications_listen_timeout) do
     table_name = schema.__schema__(:source)
-    Notifications.listen!(notifier, table_name)
+    Notifications.listen!(notifier, table_name, timeout: notifications_listen_timeout)
   end
 
   @doc """

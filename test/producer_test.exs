@@ -27,6 +27,13 @@ defmodule EctoJob.ProducerTest do
       assert {:noreply, [], ^state} = Producer.handle_info(:poll, state)
     end
 
+    test "When pending demand and available jobs", %{state: state} do
+      Repo.insert!(JobQueue.new(%{}))
+
+      assert {:noreply, [%JobQueue{}], %{demand: 9}} =
+               Producer.handle_info(:poll, %{state | demand: 10})
+    end
+
     test "When scheduled jobs can be activated", %{state: state} do
       at = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
       Repo.insert!(JobQueue.new(%{}, schedule: at))

@@ -1,3 +1,12 @@
+# 1.0.0
+
+[#24](https://github.com/mbuhot/ecto_job/pull/24) - [mbuhot](https://github.com/mbuhot) - EctoJob will work in a polling fashion when `Postgrex.Notifications` is not working reliably.
+See https://github.com/elixir-ecto/postgrex/issues/375 for some background.
+
+[#23](https://github.com/mbuhot/ecto_job/pull/23) - [enzoqtvf](https://github.com/enzoqtvf) - Add a configuration option `notifications_listen_timeout` for timeout for call to `Postgrex.Notifications.listen!/3`
+
+[#22](https://github.com/mbuhot/ecto_job/pull/22) - [niku](https://github.com/niku) - Fix code samples in README
+
 # 0.3.0
 
 [#17](https://github.com/mbuhot/ecto_job/pull/17) - [mmartinson](https://github.com/mmartinson) - Make base expiry configurable

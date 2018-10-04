@@ -277,7 +277,8 @@ defmodule EctoJob.JobQueue do
 
   Returns `{:ok, job}` when sucessful, `{:error, :expired}` otherwise.
   """
-  @spec update_job_in_progress(repo, job, DateTime.t(), integer) :: {:ok, job} | {:error, :expired}
+  @spec update_job_in_progress(repo, job, DateTime.t(), integer) ::
+          {:ok, job} | {:error, :expired}
   def update_job_in_progress(repo, job = %schema{}, now, timeout_ms) do
     {count, results} =
       repo.update_all(

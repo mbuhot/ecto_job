@@ -1,12 +1,12 @@
 defmodule EctoJob.Producer do
   @moduledoc """
-  GenStage producer responsible for reserving available jobs from a job queue, and
+  `GenStage` producer responsible for reserving available jobs from a job queue, and
   passing them on to the consumer module.
 
-  The GenStage will buffer demand when there are insufficient jobs available in the
+  The `GenStage` will buffer demand when there are insufficient jobs available in the
   database.
 
-  Installs a timer to check for expired jobs, and uses a Postgrex.Notifications listener
+  Installs a timer to check for expired jobs, and uses a `Postgrex.Notifications` listener
   to dispatch jobs immediately when new jobs are inserted into the database and there is
   pending demand.
   """
@@ -142,24 +142,15 @@ defmodule EctoJob.Producer do
   @doc """
   Messages from the timer and the notifications listener will be handled in `handle_info`.
 
-  If there is no pending demand for jobs, then all messages are ignored.
   `:poll` messages will attempt to activate jobs, and dispatch them according to current demand.
   `:notification` messages will dispatch any active jobs according to current demand.
   """
   @spec handle_info(term, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
-  def handle_info(_, state = %State{demand: 0}) do
-    {:noreply, [], state}
-  end
-
   def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
     now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
-
-    if activate_jobs(repo, schema, now) > 0 do
-      dispatch_jobs(state, now)
-    else
-      {:noreply, [], state}
-    end
+    activate_jobs(repo, schema, now)
+    dispatch_jobs(state, now)
   end
 
   def handle_info({:notification, _pid, _ref, _channel, _payload}, state = %State{clock: clock}) do
@@ -182,7 +173,12 @@ defmodule EctoJob.Producer do
   end
 
   # Reserve jobs according to demand, and construct the GenState reply tuple
+  # Short-circuit when zero demand
   @spec dispatch_jobs(State.t(), DateTime.t()) :: {:noreply, [JobQueue.job()], State.t()}
+  defp dispatch_jobs(state = %State{demand: 0}, _now) do
+    {:noreply, [], state}
+  end
+
   defp dispatch_jobs(state = %State{}, now) do
     %{repo: repo, schema: schema, demand: demand, reservation_timeout: timeout} = state
     {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now, timeout)

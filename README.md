@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 0.3"}
+  {:ecto_job, "~> 1.0"}
 ```
 
 ## Installation
@@ -217,7 +217,7 @@ Failed jobs are kept in the database so that application developers can handle t
 
 ## Job Timeouts and Transactional Safety
 
-When performing long-running jobs or when configuring a short execution timout, keep in mind that a job may be retried before it has finished and the retry has no proactive mechanism to cancel the running job.
+When performing long-running jobs or when configuring a short execution timeout, keep in mind that a job may be retried before it has finished and the retry has no proactive mechanism to cancel the running job.
 
 In the case that the initial job attempts to finish and commit a result, and the commit includes the preloaded multi passed as the first parameter to `perform/2`, the optimistic lock will fail the transaction.
 

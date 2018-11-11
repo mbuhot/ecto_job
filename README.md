@@ -158,7 +158,7 @@ Control the time for which the job is reserved while waiting for a worker to pic
 config :ecto_job, :reservation_timeout, 15_000
 ```
 
-Control the timeout for job execution before a job will be made available for retry. Begins when job is picked up by worker. Keep in mind, for jobs that are expected to retry quickly, any configured `execution_timout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
+Control the timeout for job execution before a job will be made available for retry. Begins when job is picked up by worker. Keep in mind, for jobs that are expected to retry quickly, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
 
 ```
 config :ecto_job, :execution_timeout, 300_000

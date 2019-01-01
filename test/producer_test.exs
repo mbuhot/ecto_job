@@ -1,10 +1,11 @@
 defmodule EctoJob.ProducerTest do
   use ExUnit.Case, async: true
+  alias Ecto.Adapters.SQL.Sandbox
   alias EctoJob.Producer
   alias EctoJob.Test.{JobQueue, Repo}
 
   setup do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+    :ok = Sandbox.checkout(Repo)
 
     %{
       state: %Producer.State{

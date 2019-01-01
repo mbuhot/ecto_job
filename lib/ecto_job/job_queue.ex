@@ -71,9 +71,9 @@ defmodule EctoJob.JobQueue do
         # SCHEDULED, RESERVED, IN_PROGRESS, FAILED
         field(:state, :string)
         # Time at which reserved/in_progress jobs can be reset to SCHEDULED
-        field(:expires, :utc_datetime)
+        field(:expires, :utc_datetime_usec)
         # Time at which a scheduled job can be reserved
-        field(:schedule, :utc_datetime)
+        field(:schedule, :utc_datetime_usec)
         # Counter for number of attempts for this job
         field(:attempt, :integer)
         # Maximum attempts before this job is FAILED

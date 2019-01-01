@@ -48,8 +48,13 @@ defmodule EctoJob.Migrations do
       _ =
         create table(name) do
           add(:state, :string, null: false, default: "AVAILABLE")
-          add(:expires, :utc_datetime)
-          add(:schedule, :utc_datetime, null: false, default: fragment("timezone('UTC', now())"))
+          add(:expires, :utc_datetime_usec)
+
+          add(:schedule, :utc_datetime_usec,
+            null: false,
+            default: fragment("timezone('UTC', now())")
+          )
+
           add(:attempt, :integer, null: false, default: 0)
           add(:max_attempts, :integer, null: false, default: 5)
           add(:params, :map, null: false)

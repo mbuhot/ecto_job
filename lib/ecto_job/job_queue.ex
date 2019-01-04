@@ -30,6 +30,7 @@ defmodule EctoJob.JobQueue do
    - `"AVAILABLE"`: The job is availble to be run by the next available worker
    - `"RESERVED"`: The job has been reserved by a worker for execution
    - `"IN_PROGRESS"`: The job is currently being worked
+   - `"RETRYING"`: The job has failed and it's waiting for a retry
    - `"FAILED"`: The job has exceeded the `max_attempts` and will not be retried again
   """
   @type state :: String.t()
@@ -157,7 +158,7 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs in the `"SCHEDULED"` state with scheduled time <= now to `"AVAILABLE"` state.
+  Updates all jobs in the `"SCHEDULED"` and `"RETRYING"` state with scheduled time <= now to `"AVAILABLE"` state.
 
   Returns the number of jobs updated.
   """
@@ -167,7 +168,7 @@ defmodule EctoJob.JobQueue do
       repo.update_all(
         Query.from(
           job in schema,
-          where: job.state == "SCHEDULED",
+          where: job.state in ["SCHEDULED", "RETRYING"],
           where: job.schedule <= ^now
         ),
         set: [state: "AVAILABLE", updated_at: now]
@@ -293,7 +294,7 @@ defmodule EctoJob.JobQueue do
           set: [
             attempt: job.attempt + 1,
             state: "IN_PROGRESS",
-            expires: progress_expiry(now, job.attempt + 1, timeout_ms),
+            expires: progress_time(now, job.attempt + 1, timeout_ms),
             updated_at: now
           ]
         ],
@@ -307,10 +308,43 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter.
+  Transitions a job from `"IN_PROGRESS"` to `"RETRYING"`.
+
+  Updates the state to `"RETRYING"` and changes the schedule time to
+  differentiate an expired job from one that had an exception or an error.
+
   """
-  @spec progress_expiry(DateTime.t(), integer, integer) :: DateTime.t()
-  def progress_expiry(now = %DateTime{}, attempt, timeout_ms) do
+  @spec update_job_to_retrying(repo, job, DateTime.t(), integer) ::
+          {:ok, Ecto.Schema.t()} | {:error, String.t}
+  def update_job_to_retrying(repo, job  = %schema{}, now, timeout_ms) do
+    {count, results} =
+      repo.update_all(
+        Query.from(
+          j in schema,
+          where: j.id == ^job.id,
+          where: j.state == "IN_PROGRESS"
+        ),
+        [
+          set: [
+            state: "RETRYING",
+            schedule: progress_time(now, job.attempt + 1, timeout_ms),
+            updated_at: now
+          ]
+        ],
+        returning: true
+      )
+
+    case {count, results} do
+      {0, _} -> {:error, :wrong_state_when_retrying}
+      {1, [job]} -> {:ok, job}
+    end
+  end
+
+  @doc """
+  Computes the expiry time for an `"IN_PROGRESS"` and schedule time of "RETRYING" jobs based on the current time and attempt counter.
+  """
+  @spec progress_time(DateTime.t(), integer, integer) :: DateTime.t()
+  def progress_time(now = %DateTime{}, attempt, timeout_ms) do
     timeout_ms |> Kernel.*(attempt) |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 

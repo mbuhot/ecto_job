@@ -102,6 +102,23 @@ defmodule EctoJob.JobQueueTest do
       assert count == 0
       assert Repo.get(EctoJob.Test.JobQueue, job.id).state == "RESERVED"
     end
+
+    test "Updates a scheduled RETRYING job to AVAILABLE" do
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+
+      %{id: id} =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "RETRYING")
+        |> Map.put(:schedule, schedule)
+        |> Repo.insert!()
+
+      count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
+
+      assert count == 1
+      assert Repo.get(EctoJob.Test.JobQueue, id).state == "AVAILABLE"
+    end
+
   end
 
   describe "JobQueue.activate_expired_jobs" do
@@ -315,6 +332,46 @@ defmodule EctoJob.JobQueueTest do
           now,
           @default_timeout
         )
+    end
+  end
+
+  describe "JobQueue.update_job_to_retrying" do
+    test "Does not update state if different than IN_PROGRESS" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "AVAILABLE")
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      assert {:error, :wrong_state_when_retrying} = EctoJob.JobQueue.update_job_to_retrying(Repo, job, now, @default_timeout)
+
+      assert job.state == "AVAILABLE"
+      assert job.attempt == 0
+    end
+
+    test "Moves from IN_PROGRESS to RETRYING and increase the schedule" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "IN_PROGRESS")
+        |> Map.put(:attempt, 1)
+        |> Map.put(:schedule, schedule)
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      {:ok, new_job} = EctoJob.JobQueue.update_job_to_retrying(Repo, job, now, @default_timeout)
+
+      assert new_job.state == "RETRYING"
+      assert new_job.attempt == 1
+      assert DateTime.compare(expiry, new_job.expires) == :eq
+      assert DateTime.compare(schedule, new_job.schedule) == :lt
+      assert Repo.all(Query.from(EctoJob.Test.JobQueue, where: [state: "IN_PROGRESS"])) == []
     end
   end
 end

@@ -19,14 +19,34 @@ defmodule EctoJob.Worker do
   reactivated by the producer.
   """
   @spec start_link(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: {:ok, pid}
-  def start_link(config = %Config{repo: repo, execution_timeout: timeout}, job = %queue{}, now) do
-    Task.start_link(fn ->
-      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now, timeout) do
-        queue.perform(JobQueue.initial_multi(job), job.params)
-        log_duration(config, job, now)
-        notify_completed(repo, job)
-      end
-    end)
+  def start_link(config, job, now) do
+    Task.start_link(fn -> do_work(config, job, now) end)
+  end
+
+  @spec do_work(Config.t, EctoJob.JobQueue.job(), DateTime.t()) ::
+          :ok | {:ok, EctoJob.JobQueue.job()} | {:error, any()}
+  def do_work(config = %Config{repo: repo,
+                               execution_timeout: exec_timeout,
+                               retrying_timeout: retrying_timeout},
+              job,
+              now) do
+    with {:ok, in_progress_job} <- JobQueue.update_job_in_progress(repo, job, now, exec_timeout),
+         {:ok, _} <- run_queue(config, in_progress_job) do
+      log_duration(config, in_progress_job, now)
+      notify_completed(repo, in_progress_job)
+    else
+      {:error, _, _, _} -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), retrying_timeout)
+      error -> error
+    end
+  end
+
+  @spec run_queue(Config.t, EctoJob.JobQueue.job()) :: {:ok, EctoJob.JobQueue.job()} | {:error, any()}
+  defp run_queue(%Config{repo: repo, retrying_timeout: timeout}, job = %queue{}) do
+    try do
+      queue.perform(JobQueue.initial_multi(job), job.params)
+    rescue
+      _ in RuntimeError -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
+    end
   end
 
   @spec log_duration(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: :ok

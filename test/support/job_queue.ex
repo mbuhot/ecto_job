@@ -5,5 +5,7 @@ defmodule EctoJob.Test.JobQueue do
 
   def perform(multi, params) do
     IO.inspect({multi, params})
+
+    EctoJob.Test.Repo.transaction(multi)
   end
 end

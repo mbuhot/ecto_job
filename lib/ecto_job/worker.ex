@@ -19,15 +19,48 @@ defmodule EctoJob.Worker do
   reactivated by the producer.
   """
   @spec start_link(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: {:ok, pid}
-  def start_link(config = %Config{repo: repo, execution_timeout: timeout}, job = %queue{}, now) do
-    Task.start_link(fn ->
-      with {:ok, job} <- JobQueue.update_job_in_progress(repo, job, now, timeout) do
-        queue.perform(JobQueue.initial_multi(job), job.params)
-        log_duration(config, job, now)
-        notify_completed(repo, job)
-      end
-    end)
+  def start_link(config, job, now) do
+    Task.start_link(fn -> do_work(config, job, now) end)
   end
+
+  @spec do_work(Config.t, EctoJob.JobQueue.job(), DateTime.t()) ::
+          :ok | {:ok, EctoJob.JobQueue.job()} | {:error, any()}
+  def do_work(config = %Config{repo: repo,
+                               execution_timeout: exec_timeout,
+                               retrying_timeout: retrying_timeout},
+              job,
+              now) do
+    with {:ok, in_progress_job} <- JobQueue.update_job_in_progress(repo, job, now, exec_timeout),
+                       response <- run_queue(config, in_progress_job),
+                           true <- valid?(response) do
+      log_duration(config, in_progress_job, now)
+      notify_completed(repo, in_progress_job)
+    else
+      false -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), retrying_timeout)
+      error -> error
+    end
+  end
+
+  @spec run_queue(Config.t, EctoJob.JobQueue.job()) :: {:ok, EctoJob.JobQueue.job()} | {:error, any()}
+  defp run_queue(%Config{repo: repo, retrying_timeout: timeout}, job = %queue{}) do
+    try do
+      queue.perform(JobQueue.initial_multi(job), job.params)
+    rescue
+      e ->
+        stacktrace = System.stacktrace()
+
+        JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
+
+        reraise(e, stacktrace)
+    end
+  end
+
+  @spec valid?(any()) :: boolean()
+  defp valid?(:error), do: false
+
+  defp valid?(response) when is_tuple(response), do: :error != elem(response, 0)
+
+  defp valid?(_), do: true
 
   @spec log_duration(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: :ok
   defp log_duration(%Config{log: true, log_level: log_level}, _job = %queue{id: id}, start = %DateTime{}) do

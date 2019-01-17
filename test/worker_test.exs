@@ -25,7 +25,7 @@ defmodule EctoJob.WorkerTest do
 
   describe "Worker.start_link" do
     test "update job to the IN_PROGRESS state", %{config: config} do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0000000Z], "Etc/UTC")
       now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
 
       job =
@@ -38,7 +38,7 @@ defmodule EctoJob.WorkerTest do
     end
 
     test "return expired when the IN_PROGRESS job has expired", %{config: config} do
-      expiry = DateTime.from_naive!(~N[2017-08-17T11:23:34.0Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T11:23:34.0000000Z], "Etc/UTC")
       now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
 
       job =
@@ -51,7 +51,7 @@ defmodule EctoJob.WorkerTest do
     end
 
     test "changes the state to RETRYING when the multi transaction fails", %{config: config} do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0000000Z], "Etc/UTC")
       now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
 
       job =
@@ -65,7 +65,7 @@ defmodule EctoJob.WorkerTest do
     end
 
     test "changes the state to RETRYING when perform raises an exception", %{config: config} do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0000000Z], "Etc/UTC")
       now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
 
       job =

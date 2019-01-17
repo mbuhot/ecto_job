@@ -319,7 +319,8 @@ defmodule EctoJob.JobQueue do
         Query.from(
           j in schema,
           where: j.id == ^job.id,
-          where: j.state == "IN_PROGRESS"
+          where: j.state == "IN_PROGRESS",
+          select: j
         ),
         [
           set: [
@@ -327,8 +328,7 @@ defmodule EctoJob.JobQueue do
             schedule: progress_time(now, job.attempt + 1, timeout_ms),
             updated_at: now
           ]
-        ],
-        returning: true
+        ]
       )
 
     case {count, results} do

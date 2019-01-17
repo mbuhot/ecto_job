@@ -208,6 +208,23 @@ defmodule EctoJob.JobQueueTest do
     end
   end
 
+  describe "JobQueue.fail_retrying_jobs_at_max_attempts" do
+    test "FAILS RETRYING jobs at max_attempts" do
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
+
+      %{id: id} =
+        EctoJob.Test.JobQueue.new(%{}, max_attempts: 10)
+        |> Map.put(:state, "RETRYING")
+        |> Map.put(:attempt, 10)
+        |> Repo.insert!()
+
+      count = EctoJob.JobQueue.fail_retrying_jobs_at_max_attempts(Repo, EctoJob.Test.JobQueue, now)
+
+      assert count == 1
+      assert %{state: "FAILED"} = Repo.get(EctoJob.Test.JobQueue, id)
+    end
+  end
+
   describe "JobQueue.reserve_available_jobs" do
     test "RESERVES available jobs with configurable expiry" do
       for _ <- 1..6 do

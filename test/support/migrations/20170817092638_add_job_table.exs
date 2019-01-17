@@ -1,13 +1,14 @@
 defmodule EctoJob.Test.Repo.Migrations.AddJobTable do
   use Ecto.Migration
+  alias EctoJob.Migrations.{CreateJobTable, Install}
 
   def up do
-    EctoJob.Migrations.Install.up()
-    EctoJob.Migrations.CreateJobTable.up("jobs")
+    Install.up()
+    CreateJobTable.up("jobs")
   end
 
   def down do
-    EctoJob.Migrations.CreateJobTable.down("jobs")
-    EctoJob.Migrations.Intall.down()
+    CreateJobTable.down("jobs")
+    Intall.down()
   end
 end

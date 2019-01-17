@@ -67,8 +67,8 @@ defmodule EctoJob.JobQueueTest do
 
   describe "JoqQueue.activate_scheduled_jobs" do
     test "Updates scheduled job to AVAILABLE" do
-      at = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      at = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
       %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(%{}, schedule: at))
 
       count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
@@ -78,8 +78,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Does not activate job until scheduled time passed" do
-      at = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      at = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
       %{id: id} = Repo.insert!(EctoJob.Test.JobQueue.new(%{}, schedule: at))
 
       count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
@@ -89,8 +89,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Does not activate a RESERVED job" do
-      at = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      at = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       job =
         EctoJob.Test.JobQueue.new(%{}, schedule: at)
@@ -123,8 +123,8 @@ defmodule EctoJob.JobQueueTest do
 
   describe "JobQueue.activate_expired_jobs" do
     test "Updates an expired reserved job to AVAILABLE" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       %{id: id} =
         EctoJob.Test.JobQueue.new(%{})
@@ -139,8 +139,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Updates an expired IN_PROGRESS job to AVAILABLE" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       %{id: id} =
         EctoJob.Test.JobQueue.new(%{})
@@ -155,8 +155,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Does not activate job until expiry time passed" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
 
       %{id: id} =
         EctoJob.Test.JobQueue.new(%{})
@@ -171,8 +171,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Does not update a job after max_attempts" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       %{id: id} =
         EctoJob.Test.JobQueue.new(%{}, max_attempts: 10)
@@ -191,8 +191,8 @@ defmodule EctoJob.JobQueueTest do
 
   describe "JobQueue.fail_expired_jobs_at_max_attempts" do
     test "FAILS expired IN_PROGRESS jobs at max_attempts" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       %{id: id} =
         EctoJob.Test.JobQueue.new(%{}, max_attempts: 10)
@@ -249,8 +249,8 @@ defmodule EctoJob.JobQueueTest do
 
   describe "JobQueue.update_job_in_progress" do
     test "Moves from RESERVED to IN_PROGRESS" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
 
       job =
         EctoJob.Test.JobQueue.new(%{})
@@ -267,8 +267,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Uses product of configurable execution timeout and next attempt to set expiry" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:29:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:29:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
 
       attempt = 2
       timeout = 600_000
@@ -283,12 +283,12 @@ defmodule EctoJob.JobQueueTest do
       {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, timeout)
 
       assert DateTime.diff(new_job.expires, now, :seconds) ==
-        Integer.floor_div(timeout * (attempt + 1), 1000)
+               Integer.floor_div(timeout * (attempt + 1), 1000)
     end
 
     test "Does not update if reservation expired" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:24:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
 
       job =
         EctoJob.Test.JobQueue.new(%{})
@@ -296,12 +296,13 @@ defmodule EctoJob.JobQueueTest do
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
 
-      {:error, :expired} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, @default_timeout)
+      {:error, :expired} =
+        EctoJob.JobQueue.update_job_in_progress(Repo, job, now, @default_timeout)
     end
 
     test "Does not update if attempt changed" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
 
       job =
         EctoJob.Test.JobQueue.new(%{})
@@ -315,8 +316,8 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "Does not update if state changed" do
-      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.0Z], "Etc/UTC")
-      now = DateTime.from_naive!(~N[2017-08-17T12:20:00Z], "Etc/UTC")
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
 
       job =
         EctoJob.Test.JobQueue.new(%{})

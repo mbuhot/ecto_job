@@ -72,9 +72,9 @@ defmodule EctoJob.JobQueue do
         # SCHEDULED, RESERVED, IN_PROGRESS, FAILED
         field(:state, :string)
         # Time at which reserved/in_progress jobs can be reset to SCHEDULED
-        field(:expires, :utc_datetime)
+        field(:expires, :utc_datetime_usec)
         # Time at which a scheduled job can be reserved
-        field(:schedule, :utc_datetime)
+        field(:schedule, :utc_datetime_usec)
         # Counter for number of attempts for this job
         field(:attempt, :integer)
         # Maximum attempts before this job is FAILED
@@ -229,8 +229,7 @@ defmodule EctoJob.JobQueue do
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
     repo.update_all(
       available_jobs(schema, demand),
-      [set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]],
-      returning: true
+      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
     )
   end
 
@@ -245,14 +244,14 @@ defmodule EctoJob.JobQueue do
       Query.from(
         job in schema,
         where: job.state == "AVAILABLE",
-        order_by: [asc: job.schedule],
+        order_by: [asc: job.schedule, asc: job.id],
         lock: "FOR UPDATE SKIP LOCKED",
         limit: ^demand,
         select: [:id]
       )
 
     # Ecto doesn't support subquery in where clause, so use join as workaround
-    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id)
+    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id, select: job)
   end
 
   @doc """
@@ -288,17 +287,15 @@ defmodule EctoJob.JobQueue do
           where: j.id == ^job.id,
           where: j.attempt == ^job.attempt,
           where: j.state == "RESERVED",
-          where: j.expires >= ^now
+          where: j.expires >= ^now,
+          select: j
         ),
-        [
-          set: [
-            attempt: job.attempt + 1,
-            state: "IN_PROGRESS",
-            expires: progress_time(now, job.attempt + 1, timeout_ms),
-            updated_at: now
-          ]
-        ],
-        returning: true
+        set: [
+          attempt: job.attempt + 1,
+          state: "IN_PROGRESS",
+          expires: progress_time(now, job.attempt + 1, timeout_ms),
+          updated_at: now
+        ]
       )
 
     case {count, results} do

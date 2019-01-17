@@ -293,7 +293,7 @@ defmodule EctoJob.JobQueue do
         set: [
           attempt: job.attempt + 1,
           state: "IN_PROGRESS",
-          expires: progress_time(now, job.attempt + 1, timeout_ms),
+          expires: increase_time(now, job.attempt + 1, timeout_ms),
           updated_at: now
         ]
       )
@@ -325,7 +325,7 @@ defmodule EctoJob.JobQueue do
         [
           set: [
             state: "RETRYING",
-            schedule: progress_time(now, job.attempt + 1, timeout_ms),
+            schedule: increase_time(now, job.attempt + 1, timeout_ms),
             updated_at: now
           ]
         ]
@@ -340,8 +340,8 @@ defmodule EctoJob.JobQueue do
   @doc """
   Computes the expiry time for an `"IN_PROGRESS"` and schedule time of "RETRYING" jobs based on the current time and attempt counter.
   """
-  @spec progress_time(DateTime.t(), integer, integer) :: DateTime.t()
-  def progress_time(now = %DateTime{}, attempt, timeout_ms) do
+  @spec increase_time(DateTime.t(), integer, integer) :: DateTime.t()
+  def increase_time(now = %DateTime{}, attempt, timeout_ms) do
     timeout_ms |> Kernel.*(attempt) |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 

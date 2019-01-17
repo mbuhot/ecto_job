@@ -31,11 +31,12 @@ defmodule EctoJob.Worker do
               job,
               now) do
     with {:ok, in_progress_job} <- JobQueue.update_job_in_progress(repo, job, now, exec_timeout),
-         {:ok, _} <- run_queue(config, in_progress_job) do
+                       response <- run_queue(config, in_progress_job),
+                           true <- valid?(response) do
       log_duration(config, in_progress_job, now)
       notify_completed(repo, in_progress_job)
     else
-      {:error, _, _, _} -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), retrying_timeout)
+      false -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), retrying_timeout)
       error -> error
     end
   end
@@ -48,6 +49,13 @@ defmodule EctoJob.Worker do
       _ in RuntimeError -> JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
     end
   end
+
+  @spec valid?(any()) :: boolean()
+  defp valid?(:error), do: false
+
+  defp valid?(response) when is_tuple(response), do: :error != elem(response, 0)
+
+  defp valid?(_), do: true
 
   @spec log_duration(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: :ok
   defp log_duration(%Config{log: true, log_level: log_level}, _job = %queue{id: id}, start = %DateTime{}) do

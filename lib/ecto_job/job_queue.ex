@@ -220,6 +220,26 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
+  Updates all RETRYING jobs that have been attempted the maximum number of times to `"FAILED"`.
+
+  Returns the number of jobs updated.
+  """
+  @spec fail_retrying_jobs_at_max_attempts(repo, schema, DateTime.t()) :: integer
+  def fail_retrying_jobs_at_max_attempts(repo, schema, now = %DateTime{}) do
+    {count, _} =
+      repo.update_all(
+        Query.from(
+          job in schema,
+          where: job.state in ["RETRYING"],
+          where: job.attempt >= job.max_attempts
+        ),
+        set: [state: "FAILED", expires: nil, updated_at: now]
+      )
+
+    count
+  end
+
+  @doc """
   Updates a batch of jobs in `"AVAILABLE"` state to `"RESERVED"` state with a timeout.
 
   The batch size is determined by `demand`.

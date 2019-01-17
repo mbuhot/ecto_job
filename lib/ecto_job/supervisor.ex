@@ -27,7 +27,7 @@ defmodule EctoJob.Supervisor do
   """
 
   import Supervisor.Spec, only: [worker: 2, supervisor: 2]
-  alias EctoJob.{Producer, WorkerSupervisor, Config}
+  alias EctoJob.{Config, Producer, WorkerSupervisor}
 
   @doc """
   Starts an EctoJob queue supervisor

@@ -24,7 +24,7 @@ defmodule AsyncJobApi.Mixfile do
     [
       {:ecto_job, path: "../../"},
       {:plug, "~> 1.4"},
-      {:cowboy, "~> 1.0"}
+      {:plug_cowboy, "~> 2.0"}
     ]
   end
 end

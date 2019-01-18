@@ -1,6 +1,13 @@
 defmodule EctoJob.Migrations do
   @moduledoc false
 
+  defmodule Helpers do
+    @moduledoc false
+
+    def qualify(name, nil), do: name
+    def qualify(name, prefix), do: "#{prefix}.#{name}"
+  end
+
   defmodule Install do
     @moduledoc """
     Defines migrations for installing shared functions
@@ -11,10 +18,16 @@ defmodule EctoJob.Migrations do
     @doc """
     Creates the `fn_notify_inserted` trigger function.
     This function will be called from triggers attached to job queue tables.
+
+    ## Options
+
+    * `:prefix` - the prefix (aka Postgresql schema) to create the functions in.
     """
-    def up do
+    def up(opts \\ []) do
+      prefix = Keyword.get(opts, :prefix)
+
       execute("""
-      CREATE FUNCTION fn_notify_inserted()
+      CREATE FUNCTION #{Helpers.qualify("fn_notify_inserted", prefix)}()
         RETURNS trigger AS $$
       DECLARE
       BEGIN
@@ -27,26 +40,38 @@ defmodule EctoJob.Migrations do
 
     @doc """
     Drops the `fn_notify_inserted` trigger function
+
+    ## Options
+
+    * `:prefix` - the prefix (aka Postgresql schema) containing the function to remove.
     """
-    def down do
-      execute("DROP FUNCTION fn_notify_inserted()")
+    def down(opts \\ []) do
+      prefix = Keyword.get(opts, :prefix)
+      execute("DROP FUNCTION #{Helpers.qualify("fn_notify_inserted", prefix)}()")
     end
   end
 
   defmodule CreateJobTable do
-    @doc """
+    @moduledoc """
     Defines a migration to create a table to be used as a job queue.
     This migration can be run multiple times with different values to create multiple queues.
     """
 
     import Ecto.Migration
 
-    @moduledoc """
+    @doc """
     Adds a job queue table with the given name, and attaches an insert trigger.
+
+    ## Options
+
+    * `:prefix` - the prefix (aka Postgresql schema) to create the table in.
     """
-    def up(name, _opts \\ []) do
+    def up(name, opts \\ []) do
+      opts = [{:primary_key, false} | opts]
+      prefix = Keyword.get(opts, :prefix)
+
       _ =
-        create table(name, primary_key: false) do
+        create table(name, opts) do
           add(:id, :bigserial, primary_key: true)
           add(:state, :string, null: false, default: "AVAILABLE")
           add(:expires, :utc_datetime_usec)
@@ -65,18 +90,23 @@ defmodule EctoJob.Migrations do
 
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}
-      AFTER INSERT ON #{name}
+      AFTER INSERT ON #{Helpers.qualify(name, prefix)}
       FOR EACH ROW
-      EXECUTE PROCEDURE fn_notify_inserted();
+      EXECUTE PROCEDURE #{Helpers.qualify("fn_notify_inserted", prefix)}();
       """)
     end
 
     @doc """
     Drops the job queue table with the given name, and associated trigger
+
+    ## Options
+
+    * `:prefix` - the prefix (aka Postgresql schema) containing the table to remove.
     """
-    def down(name) do
-      execute("DROP TRIGGER tr_notify_inserted_#{name} ON #{name}")
-      execute("DROP TABLE #{name}")
+    def down(name, opts \\ []) do
+      prefix = Keyword.get(opts, :prefix)
+      execute("DROP TRIGGER tr_notify_inserted_#{name} ON #{Helpers.qualify(name, prefix)}")
+      execute("DROP TABLE #{Helpers.qualify(name, prefix)}")
     end
   end
 end

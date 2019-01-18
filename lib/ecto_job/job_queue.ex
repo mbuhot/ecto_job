@@ -2,10 +2,15 @@ defmodule EctoJob.JobQueue do
   @moduledoc """
   Mixin for defining an Ecto schema for a Job Queue table in the database.
 
+  ## Options
+
+  * `:table_name` - (_required_) The name of the job table in the database.
+  * `:schema_prefix` - (_optional_) The schema prefix for the table.
+
   ## Example
 
       defmodule MyApp.JobQueue do
-        use EctoJob.JobQueue, table_name: "jobs"
+        use EctoJob.JobQueue, table_name: "jobs", schema_prefix: "my_app"
 
         @spec perform(Ecto.Multi.t(), map()) :: any()
         def perform(multi, job = %{}) do
@@ -62,10 +67,16 @@ defmodule EctoJob.JobQueue do
   """
   @callback perform(multi :: Multi.t(), params :: map) :: any()
 
-  defmacro __using__(table_name: table_name) do
+  defmacro __using__(opts) do
+    table_name = Keyword.fetch!(opts, :table_name)
+    schema_prefix = Keyword.get(opts, :schema_prefix)
+
     quote do
       use Ecto.Schema
       @behaviour EctoJob.JobQueue
+      if unquote(schema_prefix) do
+        @schema_prefix unquote(schema_prefix)
+      end
 
       schema unquote(table_name) do
         # SCHEDULED, RESERVED, IN_PROGRESS, FAILED

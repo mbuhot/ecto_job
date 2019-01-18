@@ -6,6 +6,7 @@ defmodule EctoJob.JobQueue do
 
   * `:table_name` - (_required_) The name of the job table in the database.
   * `:schema_prefix` - (_optional_) The schema prefix for the table.
+  * `:timestamps_opts` - (_optional_) Configures the timestamp fields for the schema (See `Ecto.Schema.timestamps/1`)
 
   ## Example
 
@@ -70,15 +71,25 @@ defmodule EctoJob.JobQueue do
   defmacro __using__(opts) do
     table_name = Keyword.fetch!(opts, :table_name)
     schema_prefix = Keyword.get(opts, :schema_prefix)
+    timestamps_opts = Keyword.get(opts, :timestamps_opts)
 
-    quote do
+    quote bind_quoted: [
+            table_name: table_name,
+            schema_prefix: schema_prefix,
+            timestamps_opts: timestamps_opts
+          ] do
       use Ecto.Schema
       @behaviour EctoJob.JobQueue
-      if unquote(schema_prefix) do
-        @schema_prefix unquote(schema_prefix)
+
+      if schema_prefix do
+        @schema_prefix schema_prefix
       end
 
-      schema unquote(table_name) do
+      if timestamps_opts do
+        @timestamps_opts timestamps_opts
+      end
+
+      schema table_name do
         # SCHEDULED, RESERVED, IN_PROGRESS, FAILED
         field(:state, :string)
         # Time at which reserved/in_progress jobs can be reset to SCHEDULED

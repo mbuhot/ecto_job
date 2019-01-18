@@ -65,10 +65,12 @@ defmodule EctoJob.Migrations do
     ## Options
 
     * `:prefix` - the prefix (aka Postgresql schema) to create the table in.
+    * `:timestamps` - A keyword list of options passed to the `Ecto.Migration.timestamps/1` function.
     """
     def up(name, opts \\ []) do
       opts = [{:primary_key, false} | opts]
       prefix = Keyword.get(opts, :prefix)
+      timestamp_opts = Keyword.get(opts, :timestamps, [])
 
       _ =
         create table(name, opts) do
@@ -85,7 +87,7 @@ defmodule EctoJob.Migrations do
           add(:max_attempts, :integer, null: false, default: 5)
           add(:params, :map, null: false)
           add(:notify, :string)
-          timestamps()
+          timestamps(timestamp_opts)
         end
 
       execute("""

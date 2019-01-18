@@ -44,9 +44,10 @@ defmodule EctoJob.Migrations do
     @moduledoc """
     Adds a job queue table with the given name, and attaches an insert trigger.
     """
-    def up(name) do
+    def up(name, _opts \\ []) do
       _ =
-        create table(name) do
+        create table(name, primary_key: false) do
+          add(:id, :bigserial, primary_key: true)
           add(:state, :string, null: false, default: "AVAILABLE")
           add(:expires, :utc_datetime_usec)
 

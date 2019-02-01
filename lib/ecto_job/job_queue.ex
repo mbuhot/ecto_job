@@ -175,6 +175,27 @@ defmodule EctoJob.JobQueue do
       def enqueue(multi, name, params, opts \\ []) do
         Multi.insert(multi, name, new(params, opts))
       end
+
+      @doc """
+      Requeues failed job by adding to an `Ecto.Multi` update statement,
+      which will:
+      * set `state` to `SCHEDULED`
+      * set `attempt` to `0`
+      * set `expires` to `nil`
+
+      ## Example:
+
+          Ecto.Multi.new()
+          |> MyApp.Job.requeue("requeue_job", failed_job)
+          |> MyApp.Repo.transaction()
+      """
+      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t()
+      def requeue(multi, name, job = %__MODULE__{state: "FAILED"}) do
+          job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
+          Multi.update(multi, name, job_to_requeue)
+      end
+
+      def requeue(_, _, _), do: {:error, :non_failed_job}
     end
   end
 

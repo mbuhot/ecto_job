@@ -189,7 +189,7 @@ defmodule EctoJob.JobQueue do
           |> MyApp.Job.requeue("requeue_job", failed_job)
           |> MyApp.Repo.transaction()
       """
-      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t()
+      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t() | {:error, :non_failed_job}
       def requeue(multi, name, job = %__MODULE__{state: "FAILED"}) do
           job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
           Multi.update(multi, name, job_to_requeue)

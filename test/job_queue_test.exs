@@ -65,6 +65,40 @@ defmodule EctoJob.JobQueueTest do
     end
   end
 
+  describe "JobQueue.requeue" do
+    test "Adds an operation to the Ecto.Multi" do
+      failed_job = %EctoJob.Test.JobQueue{state: "FAILED"}
+
+      multi =
+        Ecto.Multi.new()
+        |> EctoJob.Test.JobQueue.requeue(:requeue_job, failed_job)
+        |> Ecto.Multi.to_list()
+
+      assert [
+        requeue_job:
+          {
+            :update,
+            %Ecto.Changeset{
+              action: :update,
+              data: %EctoJob.Test.JobQueue{},
+              changes: %{attempt: 0, state: "SCHEDULED"}
+            },
+            []
+          }
+      ] = multi
+    end
+
+    test "Returns an error when job status is not FAILED" do
+      non_failed_job = %EctoJob.Test.JobQueue{state: "IN_PROGRESS"}
+
+      result =
+        Ecto.Multi.new()
+        |> EctoJob.Test.JobQueue.requeue(:requeue_job, non_failed_job)
+
+      assert result == {:error, :non_failed_job}
+    end
+  end
+
   describe "JoqQueue.activate_scheduled_jobs" do
     test "Updates scheduled job to AVAILABLE" do
       at = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")

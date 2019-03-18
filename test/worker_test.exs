@@ -74,8 +74,14 @@ defmodule EctoJob.WorkerTest do
         |> Map.put(:expires, expiry)
         |> Repo.insert!()
 
-      assert :ok = Worker.do_work(config, job, now)
-      assert Repo.get(EctoJob.Test.JobQueue, job.id).state == "RETRYING"
+      try do
+        Worker.do_work(config, job, now)
+      rescue
+        _ -> assert Repo.get(EctoJob.Test.JobQueue, job.id).state == "RETRYING"
+      else
+        _ -> assert false
+      end
+
     end
   end
 end

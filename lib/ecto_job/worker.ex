@@ -46,7 +46,7 @@ defmodule EctoJob.Worker do
     try do
       queue.perform(JobQueue.initial_multi(job), job.params)
     rescue
-      e in RuntimeError ->
+      e ->
         JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
 
         reraise(e, System.stacktrace())

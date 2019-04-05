@@ -299,7 +299,7 @@ defmodule EctoJob.JobQueueTest do
 
       {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, timeout)
 
-      assert DateTime.diff(new_job.expires, now, :seconds) ==
+      assert DateTime.diff(new_job.expires, now, :second) ==
                Integer.floor_div(timeout * (attempt + 1), 1000)
     end
 

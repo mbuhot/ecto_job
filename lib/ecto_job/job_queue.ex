@@ -2,10 +2,16 @@ defmodule EctoJob.JobQueue do
   @moduledoc """
   Mixin for defining an Ecto schema for a Job Queue table in the database.
 
+  ## Options
+
+  * `:table_name` - (_required_) The name of the job table in the database.
+  * `:schema_prefix` - (_optional_) The schema prefix for the table.
+  * `:timestamps_opts` - (_optional_) Configures the timestamp fields for the schema (See `Ecto.Schema.timestamps/1`)
+
   ## Example
 
       defmodule MyApp.JobQueue do
-        use EctoJob.JobQueue, table_name: "jobs"
+        use EctoJob.JobQueue, table_name: "jobs", schema_prefix: "my_app"
 
         @spec perform(Ecto.Multi.t(), map()) :: any()
         def perform(multi, job = %{}) do
@@ -62,18 +68,34 @@ defmodule EctoJob.JobQueue do
   """
   @callback perform(multi :: Multi.t(), params :: map) :: any()
 
-  defmacro __using__(table_name: table_name) do
-    quote do
+  defmacro __using__(opts) do
+    table_name = Keyword.fetch!(opts, :table_name)
+    schema_prefix = Keyword.get(opts, :schema_prefix)
+    timestamps_opts = Keyword.get(opts, :timestamps_opts)
+
+    quote bind_quoted: [
+            table_name: table_name,
+            schema_prefix: schema_prefix,
+            timestamps_opts: timestamps_opts
+          ] do
       use Ecto.Schema
       @behaviour EctoJob.JobQueue
 
-      schema unquote(table_name) do
+      if schema_prefix do
+        @schema_prefix schema_prefix
+      end
+
+      if timestamps_opts do
+        @timestamps_opts timestamps_opts
+      end
+
+      schema table_name do
         # SCHEDULED, RESERVED, IN_PROGRESS, FAILED
         field(:state, :string)
         # Time at which reserved/in_progress jobs can be reset to SCHEDULED
-        field(:expires, :utc_datetime)
+        field(:expires, :utc_datetime_usec)
         # Time at which a scheduled job can be reserved
-        field(:schedule, :utc_datetime)
+        field(:schedule, :utc_datetime_usec)
         # Counter for number of attempts for this job
         field(:attempt, :integer)
         # Maximum attempts before this job is FAILED
@@ -153,6 +175,27 @@ defmodule EctoJob.JobQueue do
       def enqueue(multi, name, params, opts \\ []) do
         Multi.insert(multi, name, new(params, opts))
       end
+
+      @doc """
+      Requeues failed job by adding to an `Ecto.Multi` update statement,
+      which will:
+      * set `state` to `SCHEDULED`
+      * set `attempt` to `0`
+      * set `expires` to `nil`
+
+      ## Example:
+
+          Ecto.Multi.new()
+          |> MyApp.Job.requeue("requeue_job", failed_job)
+          |> MyApp.Repo.transaction()
+      """
+      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t() | {:error, :non_failed_job}
+      def requeue(multi, name, job = %__MODULE__{state: "FAILED"}) do
+          job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
+          Multi.update(multi, name, job_to_requeue)
+      end
+
+      def requeue(_, _, _), do: {:error, :non_failed_job}
     end
   end
 
@@ -228,8 +271,7 @@ defmodule EctoJob.JobQueue do
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
     repo.update_all(
       available_jobs(schema, demand),
-      [set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]],
-      returning: true
+      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
     )
   end
 
@@ -244,14 +286,14 @@ defmodule EctoJob.JobQueue do
       Query.from(
         job in schema,
         where: job.state == "AVAILABLE",
-        order_by: [asc: job.schedule],
+        order_by: [asc: job.schedule, asc: job.id],
         lock: "FOR UPDATE SKIP LOCKED",
         limit: ^demand,
         select: [:id]
       )
 
     # Ecto doesn't support subquery in where clause, so use join as workaround
-    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id)
+    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id, select: job)
   end
 
   @doc """
@@ -287,17 +329,15 @@ defmodule EctoJob.JobQueue do
           where: j.id == ^job.id,
           where: j.attempt == ^job.attempt,
           where: j.state == "RESERVED",
-          where: j.expires >= ^now
+          where: j.expires >= ^now,
+          select: j
         ),
-        [
-          set: [
-            attempt: job.attempt + 1,
-            state: "IN_PROGRESS",
-            expires: progress_expiry(now, job.attempt + 1, timeout_ms),
-            updated_at: now
-          ]
-        ],
-        returning: true
+        set: [
+          attempt: job.attempt + 1,
+          state: "IN_PROGRESS",
+          expires: progress_expiry(now, job.attempt + 1, timeout_ms),
+          updated_at: now
+        ]
       )
 
     case {count, results} do

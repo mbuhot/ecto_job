@@ -1,3 +1,16 @@
+# 2.0.0
+
+EctoJob 2.0 adds support for Ecto 3.0.
+
+There should be no breaking changes other than the dependency on `ecto_sql ~> 3.0`.
+
+[#31](https://github.com/mbuhot/ecto_job/pull/31) - [mbuhot](https://github.com/mbuhot) - Timestamp options on job tables can be customized.
+
+[#30](https://github.com/mbuhot/ecto_job/pull/30) - [mbuhot](https://github.com/mbuhot) - Job tables can be declared with custom `schema_prefix`.
+
+[#29](https://github.com/mbuhot/ecto_job/pull/29) - [mbuhot](https://github.com/mbuhot) - EctoJob will always use a `:bigserial` primary key instead of relying on the `ecto` default.
+
+
 # 1.0.0
 
 [#24](https://github.com/mbuhot/ecto_job/pull/24) - [mbuhot](https://github.com/mbuhot) - EctoJob will work in a polling fashion when `Postgrex.Notifications` is not working reliably.

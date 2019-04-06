@@ -31,7 +31,7 @@ defmodule EctoJob.Worker do
 
   @spec log_duration(Config.t, EctoJob.JobQueue.job(), DateTime.t()) :: :ok
   defp log_duration(%Config{log: true, log_level: log_level}, _job = %queue{id: id}, start = %DateTime{}) do
-    duration = DateTime.diff(DateTime.utc_now(), start, :microseconds)
+    duration = DateTime.diff(DateTime.utc_now(), start, :microsecond)
     Logger.log(log_level, fn -> "#{queue}[#{id}] done: #{duration} µs" end)
   end
   defp log_duration(_config, _job, _start), do: :ok

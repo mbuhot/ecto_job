@@ -10,6 +10,8 @@ defmodule EctoJobDemo do
 
   # function used when calling from exq
   def perform(name) do
-    IO.puts("Hello #{name}")
+    IO.puts("Hello #{name} start")
+    Process.sleep(500)
+    IO.puts("Hello #{name} done")
   end
 end

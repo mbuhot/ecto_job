@@ -6,15 +6,15 @@ defmodule EctoJobDemo.Application do
   use Application
 
   def start(_type, _args) do
-    # List all child processes to be supervised
-    children = [
-      {EctoJobDemo.Repo, []},
-      {EctoJobDemo.JobQueue, [repo: EctoJobDemo.Repo, max_demand: 100]}
-    ]
-
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
+    children = [EctoJobDemo.Repo] ++ job_queue_children()
     opts = [strategy: :one_for_one, name: EctoJobDemo.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  def job_queue_children() do
+    case Application.get_env(:ecto_job_demo, EctoJobDemo.JobQueue) do
+      nil -> []
+      config -> [{EctoJobDemo.JobQueue, config}]
+    end
   end
 end

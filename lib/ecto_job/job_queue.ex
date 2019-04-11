@@ -146,7 +146,7 @@ defmodule EctoJob.JobQueue do
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
       """
-      @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
+      @spec new(map, Keyword.t() | nil) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
         %__MODULE__{
           state: if(opts[:schedule], do: "SCHEDULED", else: "AVAILABLE"),

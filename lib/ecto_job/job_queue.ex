@@ -45,11 +45,12 @@ defmodule EctoJob.JobQueue do
   """
   @type job :: %{
           __struct__: module,
+          __meta__: Ecto.Schema.Metadata.t(),
           id: integer | nil,
           state: state,
           expires: DateTime.t() | nil,
           schedule: DateTime.t() | nil,
-          attempt: integer(),
+          attempt: integer,
           max_attempts: integer | nil,
           params: map(),
           notify: String.t() | nil,
@@ -189,10 +190,11 @@ defmodule EctoJob.JobQueue do
           |> MyApp.Job.requeue("requeue_job", failed_job)
           |> MyApp.Repo.transaction()
       """
-      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t() | {:error, :non_failed_job}
+      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) ::
+              Multi.t() | {:error, :non_failed_job}
       def requeue(multi, name, job = %__MODULE__{state: "FAILED"}) do
-          job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
-          Multi.update(multi, name, job_to_requeue)
+        job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
+        Multi.update(multi, name, job_to_requeue)
       end
 
       def requeue(_, _, _), do: {:error, :non_failed_job}

@@ -60,12 +60,16 @@ defmodule EctoJob.Mixfile do
     [
       {:ecto_sql, "~> 3.0"},
       {:postgrex, "~> 0.14"},
-      {:jason, "~> 1.0"},
+      {:jason, "~> 1.1"},
       {:gen_stage, "~> 0.13"},
       {:credo, "~> 1.0", only: :dev, runtime: false},
-      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.12", only: :dev, runtime: false},
-      {:inch_ex, ">= 0.4.0", only: :dev, runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.6", only: :dev, runtime: false},
+
+      # pinned for elixir 1.6 compat
+      {:ex_doc, "~> 0.18.0", only: :dev, runtime: false},
+
+      # pinned for elixir 1.6 compat
+      {:inch_ex, "~> 1.0", only: :dev, runtime: false}
     ]
   end
 end

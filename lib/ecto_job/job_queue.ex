@@ -148,7 +148,7 @@ defmodule EctoJob.JobQueue do
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
-        %__MODULE__{
+        struct!(__MODULE__, %{
           state: if(opts[:schedule], do: "SCHEDULED", else: "AVAILABLE"),
           expires: nil,
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
@@ -156,7 +156,7 @@ defmodule EctoJob.JobQueue do
           max_attempts: opts[:max_attempts],
           params: params,
           notify: opts[:notify]
-        }
+        })
       end
 
       @doc """

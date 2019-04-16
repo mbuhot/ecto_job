@@ -138,9 +138,9 @@ When a queue handles multiple job types, it is useful to pattern match on the jo
 defmodule MyApp.JobQueue do
   use EctoJob.JobQueue, table_name: "jobs"
 
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail"},      do: MyApp.SendEmail.perform(multi, job)
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "CustomerReport"}, do: MyApp.CustomerReport.perform(multi, job)
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SyncWithCRM"},    do: MyApp.CRMSync.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail"}),      do: MyApp.SendEmail.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "CustomerReport"}), do: MyApp.CustomerReport.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SyncWithCRM"}),    do: MyApp.CRMSync.perform(multi, job)
   ...
 end
 ```

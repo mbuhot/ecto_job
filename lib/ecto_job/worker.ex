@@ -41,7 +41,7 @@ defmodule EctoJob.Worker do
     end
   end
 
-  @spec run_queue(Config.t, EctoJob.JobQueue.job()) :: {:ok, EctoJob.JobQueue.job()} | {:error, any()}
+  @spec run_queue(Config.t, EctoJob.JobQueue.job()) :: any()
   defp run_queue(%Config{repo: repo, retrying_timeout: timeout}, job = %queue{}) do
     try do
       queue.perform(JobQueue.initial_multi(job), job.params)
@@ -49,7 +49,7 @@ defmodule EctoJob.Worker do
       e ->
         stacktrace = System.stacktrace()
 
-        JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
+        _ = JobQueue.update_job_to_retrying(repo, job, DateTime.utc_now(), timeout)
 
         reraise(e, stacktrace)
     end

@@ -271,10 +271,20 @@ defmodule EctoJob.JobQueue do
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
-    repo.update_all(
-      available_jobs(schema, demand),
-      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
-    )
+    {:ok, result} =
+      repo.transaction(fn ->
+        # Force the materialization of the claimed Job IDs,
+        # otherwise postgres may return more rows than intended.
+        # see (https://github.com/feikesteenbergen/demos/blob/master/bugs/update_from_correlated.adoc)
+        job_ids = repo.all(available_jobs(schema, demand))
+
+        repo.update_all(
+          Query.from(job in schema, where: job.id in ^job_ids, select: job),
+          set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+        )
+      end)
+
+    result
   end
 
   @doc """
@@ -284,18 +294,14 @@ defmodule EctoJob.JobQueue do
   """
   @spec available_jobs(schema, integer) :: Ecto.Query.t()
   def available_jobs(schema, demand) do
-    query =
-      Query.from(
-        job in schema,
-        where: job.state == "AVAILABLE",
-        order_by: [asc: job.schedule, asc: job.id],
-        lock: "FOR UPDATE SKIP LOCKED",
-        limit: ^demand,
-        select: [:id]
-      )
-
-    # Ecto doesn't support subquery in where clause, so use join as workaround
-    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id, select: job)
+    Query.from(
+      job in schema,
+      where: job.state == "AVAILABLE",
+      order_by: [asc: job.schedule, asc: job.id],
+      lock: "FOR UPDATE SKIP LOCKED",
+      limit: ^demand,
+      select: job.id
+    )
   end
 
   @doc """

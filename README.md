@@ -202,11 +202,18 @@ Control the time for which the job is reserved while waiting for a worker to pic
 config :ecto_job, :reservation_timeout, 15_000
 ```
 
-Control the timeout for job execution before a job will be made available for retry. Begins when job is picked up by worker. Keep in mind, for jobs that are expected to retry quickly, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
+Control the delay between retries following a job execution failure. Keep in mind, for jobs that are expected to retry quickly, any configured `retry_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `30_000` ms (30 seconds).
+
+```
+config :ecto_job, :retry_timeout, 30_000
+```
+
+Control the timeout for job execution before an "IN_PROGRESS" job is assumed to have failed. Begins when job is picked up by worker. Similarly to `retry_timeout`, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
 
 ```
 config :ecto_job, :execution_timeout, 300_000
 ```
+
 
 You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
@@ -252,7 +259,8 @@ Once a consumer is given a job, it increments the attempt counter and updates th
 If the job is being retried, the expiry will be initial timeout * the attempt counter.
 
 If successful, the consumer can delete the job from the queue using the preloaded multi passed to the `perform/2` job handler.
-If an exception is raised in the worker or a successful processing attempt fails to successfully commit the preloaded multi, the job is not deleted and remains in the "IN_PROGRESS" state until it expires.
+If an exception is raised in the worker or a successful processing attempt fails to successfully commit the preloaded multi, the job is transitioned to the "RETRY" state, scheduled to run again after `retry_timeout` * attempt counter.
+If the processes is killed or is otherwise unable to transition to "RETRY", it will remain in "IN_PROGRESS" until the `execution_timeout` expires.
 
 Jobs in the "RESERVED" or "IN_PROGRESS" state past the expiry time will be returned to the "AVAILABLE" state.
 

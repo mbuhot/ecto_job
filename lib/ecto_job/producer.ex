@@ -149,7 +149,6 @@ defmodule EctoJob.Producer do
   def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
     now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
-    _ = JobQueue.fail_retrying_jobs_at_max_attempts(repo, schema, now)
     activate_jobs(repo, schema, now)
     dispatch_jobs(state, now)
   end

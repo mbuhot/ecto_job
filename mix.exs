@@ -62,7 +62,8 @@ defmodule EctoJob.Mixfile do
       {:credo, "~> 1.0", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0.0-rc.6", only: :dev, runtime: false},
       {:ex_doc, "~> 0.12", only: :dev, runtime: false},
-      {:inch_ex, ">= 0.4.0", only: :dev, runtime: false}
+      {:inch_ex, ">= 0.4.0", only: :dev, runtime: false},
+      {:phoenix_live_view, github: "phoenixframework/phoenix_live_view"}
     ]
   end
 end

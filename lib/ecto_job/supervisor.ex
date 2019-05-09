@@ -27,7 +27,7 @@ defmodule EctoJob.Supervisor do
   """
 
   import Supervisor.Spec, only: [worker: 2, supervisor: 2]
-  alias EctoJob.{Config, Producer, WorkerSupervisor}
+  alias EctoJob.{Config, Producer, WorkerSupervisor, LiveUpdates}
 
   @doc """
   Starts an EctoJob queue supervisor
@@ -41,7 +41,8 @@ defmodule EctoJob.Supervisor do
           poll_interval: poll_interval,
           reservation_timeout: reservation_timeout,
           execution_timeout: execution_timeout,
-          notifications_listen_timeout: notifications_listen_timeout
+          notifications_listen_timeout: notifications_listen_timeout,
+          live_view_pubsub_name: live_view_pubsub_name
         }
       ) do
     supervisor_name = String.to_atom("#{schema}.Supervisor")
@@ -60,6 +61,14 @@ defmodule EctoJob.Supervisor do
           reservation_timeout: reservation_timeout,
           execution_timeout: execution_timeout,
           notifications_listen_timeout: notifications_listen_timeout
+        ]
+      ]),
+      worker(LiveUpdates,  [
+        [
+          name: LiveUpdates,
+          repo: repo,
+          schema: schema,
+          live_view_pubsub_name: live_view_pubsub_name
         ]
       ]),
       supervisor(WorkerSupervisor, [

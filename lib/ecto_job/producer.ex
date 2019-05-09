@@ -12,7 +12,7 @@ defmodule EctoJob.Producer do
   """
 
   use GenStage
-  alias EctoJob.JobQueue
+  alias EctoJob.{JobQueue, LiveUpdates}
   alias Postgrex.Notifications
   require Logger
 
@@ -150,6 +150,7 @@ defmodule EctoJob.Producer do
     now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
     activate_jobs(repo, schema, now)
+    LiveUpdates.notify_live_view(LiveUpdates)
     dispatch_jobs(state, now)
   end
 

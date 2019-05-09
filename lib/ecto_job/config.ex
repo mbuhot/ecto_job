@@ -31,6 +31,7 @@ defmodule EctoJob.Config do
 
   defstruct repo: nil,
             schema: nil,
+            live_view_pubsub_name: nil,
             max_demand: 100,
             log: true,
             log_level: :info,

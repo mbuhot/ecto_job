@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 2.0"}
+  {:ecto_job, "~> 2.1"}
 ```
 
 ## Installation

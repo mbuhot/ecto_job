@@ -55,7 +55,7 @@ defmodule EctoJob.Mixfile do
 
   defp deps do
     [
-      {:ecto_sql, "~> 3.0"},
+      {:ecto_sql, github: "elixir-ecto/ecto_sql"},
       {:postgrex, "~> 0.14"},
       {:jason, "~> 1.0"},
       {:gen_stage, "~> 0.13"},

@@ -54,6 +54,7 @@ defmodule EctoJob.JobQueue do
           max_attempts: integer | nil,
           params: map(),
           notify: String.t() | nil,
+          priority: integer | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -105,6 +106,8 @@ defmodule EctoJob.JobQueue do
         field(:params, :map)
         # Payload used to notify that job has completed
         field(:notify, :string)
+        # Used to prioritize the job execution
+        field(:priority, :integer)
         timestamps()
       end
 
@@ -146,6 +149,7 @@ defmodule EctoJob.JobQueue do
 
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
+       - `:priority` : the priority of this work, the default value is `0`. Increase this value to decrease priority.
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
@@ -156,7 +160,8 @@ defmodule EctoJob.JobQueue do
           attempt: 0,
           max_attempts: opts[:max_attempts],
           params: params,
-          notify: opts[:notify]
+          notify: opts[:notify],
+          priority: Keyword.get(opts, :priority, 0)
         }
       end
 
@@ -297,7 +302,7 @@ defmodule EctoJob.JobQueue do
     Query.from(
       job in schema,
       where: job.state == "AVAILABLE",
-      order_by: [asc: job.schedule, asc: job.id],
+      order_by: [asc: job.priority, asc: job.schedule, asc: job.id],
       lock: "FOR UPDATE SKIP LOCKED",
       limit: ^demand,
       select: job.id

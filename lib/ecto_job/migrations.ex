@@ -91,6 +91,8 @@ defmodule EctoJob.Migrations do
           timestamps(timestamp_opts)
         end
 
+      create(index(name, [:priority, :schedule, :id]))
+
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}
       AFTER INSERT ON #{Helpers.qualify(name, prefix)}
@@ -113,27 +115,31 @@ defmodule EctoJob.Migrations do
     end
   end
 
-  defmodule AddPriorityToJobTable do
+  defmodule UpdateJobTable do
     @moduledoc """
-    Defines a migration to add priority column to the job queue table.
+    Defines an update migration to an especific version of Ecto Job.
     This migration can be run multiple times with different values to update multiple queues.
     """
 
     import Ecto.Migration
 
     @doc """
-    Add the priority column to the job queue table with the given name.
+    Upgrade the job queue table with the given ecto job version and name.
     """
-    def up(name) do
+    def up(3, name) do
       alter table(name) do
         add(:priority, :integer, null: false, default: 0)
       end
+
+      create(index(name, [:priority, :schedule, :id]))
     end
 
     @doc """
-    Drops the priority column from job queue table with the given name.
+    Rollback updates from job queue table with the given ecto job version and name.
     """
-    def down(name) do
+    def down(3, name) do
+      drop(index(name, [:priority, :schedule, :id]))
+
       alter table(name) do
         remove(:priority)
       end

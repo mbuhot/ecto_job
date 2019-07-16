@@ -2,6 +2,7 @@ defmodule EctoJobPriorityDemo.JobMonitor do
   @moduledoc false
   use GenServer
 
+  alias Ecto.Multi
   alias EctoJobPriorityDemo.JobQueue
   alias EctoJobPriorityDemo.Repo
 
@@ -33,24 +34,34 @@ defmodule EctoJobPriorityDemo.JobMonitor do
   end
 
   def handle_info({:produce_jobs, count, priority, period}, state) do
-    jobs =
-      Enum.map(1..count, fn _ ->
-        %{
-          state: "AVAILABLE",
-          expires: nil,
-          schedule: DateTime.utc_now(),
-          attempt: 0,
-          max_attempts: 5,
-          params: %{priority: priority},
-          notify: nil,
-          priority: priority,
-          updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-          inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-        }
-      end)
+    Multi.new()
+    |> Multi.run(:create_jobs, fn _repo, _ ->
+      jobs =
+        Enum.map(1..count, fn _ ->
+          %{
+            state: "AVAILABLE",
+            expires: nil,
+            schedule: DateTime.utc_now(),
+            attempt: 0,
+            max_attempts: 5,
+            params: %{priority: priority},
+            notify: nil,
+            priority: priority,
+            updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+            inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          }
+        end)
 
-    JobQueue
-    |> Repo.insert_all(jobs)
+      {:ok, jobs}
+    end)
+    |> Multi.run(:insert_jobs, fn _repo, %{create_jobs: jobs} ->
+      result =
+        JobQueue
+        |> Repo.insert_all(jobs)
+
+      {:ok, result}
+    end)
+    |> Repo.transaction()
 
     Process.send_after(self(), {:produce_jobs, count, priority, period}, period)
 

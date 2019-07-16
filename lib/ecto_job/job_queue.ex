@@ -54,7 +54,7 @@ defmodule EctoJob.JobQueue do
           max_attempts: integer | nil,
           params: map(),
           notify: String.t() | nil,
-          priority: integer | nil,
+          priority: integer,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -149,7 +149,7 @@ defmodule EctoJob.JobQueue do
 
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
-       - `:priority` : the priority of this work, the default value is `0`. Increase this value to decrease priority.
+       - `:priority` (integer): lower numbers run first; default is 0
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do

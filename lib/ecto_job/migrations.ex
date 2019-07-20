@@ -87,8 +87,11 @@ defmodule EctoJob.Migrations do
           add(:max_attempts, :integer, null: false, default: 5)
           add(:params, :map, null: false)
           add(:notify, :string)
+          add(:priority, :integer, null: false, default: 0)
           timestamps(timestamp_opts)
         end
+
+      create(index(name, [:priority, :schedule, :id]))
 
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}
@@ -109,6 +112,37 @@ defmodule EctoJob.Migrations do
       prefix = Keyword.get(opts, :prefix)
       execute("DROP TRIGGER tr_notify_inserted_#{name} ON #{Helpers.qualify(name, prefix)}")
       execute("DROP TABLE #{Helpers.qualify(name, prefix)}")
+    end
+  end
+
+  defmodule UpdateJobTable do
+    @moduledoc """
+    Defines an update migration to an especific version of Ecto Job.
+    This migration can be run multiple times with different values to update multiple queues.
+    """
+
+    import Ecto.Migration
+
+    @doc """
+    Upgrade the job queue table with the given ecto job version and name.
+    """
+    def up(3, name) do
+      alter table(name) do
+        add(:priority, :integer, null: false, default: 0)
+      end
+
+      create(index(name, [:priority, :schedule, :id]))
+    end
+
+    @doc """
+    Rollback updates from job queue table with the given ecto job version and name.
+    """
+    def down(3, name) do
+      drop(index(name, [:priority, :schedule, :id]))
+
+      alter table(name) do
+        remove(:priority)
+      end
     end
   end
 end

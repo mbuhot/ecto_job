@@ -1,0 +1,11 @@
+version: '2'
+
+services:
+  ecto-job-test:
+    image: postgres:9.6-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ecto_job_test

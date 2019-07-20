@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 2.1"}
+  {:ecto_job, "~> 3.0"}
 ```
 
 ## Installation
@@ -47,6 +47,26 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
   def down do
     EctoJob.Migrations.CreateJobTable.down("jobs")
     EctoJob.Migrations.Install.down()
+  end
+end
+```
+
+### Upgrading pre-existent Ecto Job to 3.0 version
+
+To upgrade your project to 3.0 version of ecto job you must add a migration to update the pre-existent job queue tables:
+
+```
+mix ecto.gen.migration update_job_queue
+```
+
+```elixir
+defmodule MyApp.Repo.Migrations.UpdateJobQueue do
+  use Ecto.Migration
+  def up do
+    EctoJob.Migrations.UpdateJobTable.up(3, "jobs")
+  end
+  def down do
+    EctoJob.Migrations.UpdateJobTable.down(3, "jobs")
   end
 end
 ```
@@ -100,6 +120,26 @@ A job can be inserted into the Repo directly by constructing a job with the `new
 ```elixir
 %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
 |> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+A job can be inserted with optional params:
+
+- `:schedule` : runs the job at the given `%DateTime{}`. The default value is `DateTime.utc_now()`.
+- `:max_attempts` : the maximum attempts for this job. The default value is `5`.
+- `:priority` (integer): lower numbers run first; default is 0
+
+```elixir
+%{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(max_attempts: 10)
+|> MyApp.Repo.insert()
+
+%{"type" => "SendEmail", "address" => "mickel@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 1)
+|> MyApp.Repo.insert()
+
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2)
 |> MyApp.Repo.insert()
 ```
 

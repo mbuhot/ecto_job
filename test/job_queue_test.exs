@@ -27,6 +27,7 @@ defmodule EctoJob.JobQueueTest do
                  :max_attempts,
                  :params,
                  :notify,
+                 :priority,
                  :inserted_at,
                  :updated_at
                ]
@@ -48,6 +49,16 @@ defmodule EctoJob.JobQueueTest do
     test "Accepts a max_attempts option" do
       job = EctoJob.Test.JobQueue.new(%{}, max_attempts: 123)
       assert job.max_attempts == 123
+    end
+
+    test "Created with default priority value" do
+      job = EctoJob.Test.JobQueue.new(%{})
+      assert job.priority == 0
+    end
+
+    test "Accepts a priority option" do
+      job = EctoJob.Test.JobQueue.new(%{}, priority: 1)
+      assert job.priority == 1
     end
   end
 
@@ -261,6 +272,40 @@ defmodule EctoJob.JobQueueTest do
                )
 
       assert DateTime.compare(c.schedule, e.schedule) == :lt
+    end
+
+    test "RESERVES available jobs with high priority first" do
+      high_priority = 1
+      low_priority = 2
+
+      for _ <- 1..3 do
+        Repo.insert!(EctoJob.Test.JobQueue.new(%{}, priority: low_priority))
+      end
+
+      for _ <- 1..3 do
+        Repo.insert!(EctoJob.Test.JobQueue.new(%{}, priority: high_priority))
+      end
+
+      reserve_jobs = fn demand ->
+        EctoJob.JobQueue.reserve_available_jobs(
+          Repo,
+          EctoJob.Test.JobQueue,
+          demand,
+          DateTime.utc_now(),
+          300_000
+        )
+      end
+
+      {3, high_priority_jobs} = reserve_jobs.(3)
+      {3, low_priority_jobs} = reserve_jobs.(3)
+
+      Enum.each(high_priority_jobs, fn job ->
+        assert job.priority == high_priority
+      end)
+
+      Enum.each(low_priority_jobs, fn job ->
+        assert job.priority == low_priority
+      end)
     end
   end
 

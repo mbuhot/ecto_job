@@ -276,20 +276,11 @@ defmodule EctoJob.JobQueue do
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
-    {:ok, result} =
-      repo.transaction(fn ->
-        # Force the materialization of the claimed Job IDs,
-        # otherwise postgres may return more rows than intended.
-        # see (https://github.com/feikesteenbergen/demos/blob/master/bugs/update_from_correlated.adoc)
-        job_ids = repo.all(available_jobs(schema, demand))
-
-        repo.update_all(
-          Query.from(job in schema, where: job.id in ^job_ids, select: job),
-          set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
-        )
-      end)
-
-    result
+    schema
+    |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
+    |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
+    |> Query.select([job], job)
+    |> repo.update_all(set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now])
   end
 
   @doc """
@@ -305,7 +296,7 @@ defmodule EctoJob.JobQueue do
       order_by: [asc: job.priority, asc: job.schedule, asc: job.id],
       lock: "FOR UPDATE SKIP LOCKED",
       limit: ^demand,
-      select: job.id
+      select: %{id: job.id}
     )
   end
 

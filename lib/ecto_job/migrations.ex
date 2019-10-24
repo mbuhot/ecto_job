@@ -95,12 +95,13 @@ defmodule EctoJob.Migrations do
           timestamps(timestamp_opts)
         end
 
-      case version do
-        2 ->
-          create(index(name, [:schedule, :id]))
-        3 ->
-          create(index(name, [:priority, :schedule, :id]))
-      end
+      _ =
+        case version do
+          2 ->
+            create(index(name, [:schedule, :id]))
+          3 ->
+            create(index(name, [:priority, :schedule, :id]))
+        end
 
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}
@@ -147,7 +148,7 @@ defmodule EctoJob.Migrations do
     Rollback updates from job queue table with the given ecto job version and name.
     """
     def down(3, name) do
-      drop(index(name, [:priority, :schedule, :id]))
+      _ = drop(index(name, [:priority, :schedule, :id]))
 
       alter table(name) do
         remove(:priority)

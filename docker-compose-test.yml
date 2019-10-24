@@ -2,7 +2,7 @@ version: '2'
 
 services:
   ecto-job-test:
-    image: postgres:9.6-alpine
+    image: postgres:alpine
     ports:
       - "5432:5432"
     environment:

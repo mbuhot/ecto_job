@@ -36,6 +36,7 @@ defmodule EctoJob.JobQueue do
    - `"AVAILABLE"`: The job is availble to be run by the next available worker
    - `"RESERVED"`: The job has been reserved by a worker for execution
    - `"IN_PROGRESS"`: The job is currently being worked
+   - `"RETRY"`: The job has failed and it's waiting for a retry
    - `"FAILED"`: The job has exceeded the `max_attempts` and will not be retried again
   """
   @type state :: String.t()
@@ -62,13 +63,18 @@ defmodule EctoJob.JobQueue do
   @doc """
   Job execution callback to be implemented by each `JobQueue` module.
 
+  The return type is the same as `Ecto.Repo.transaction/1`.
+
   ## Example
 
       @impl true
       def perform(multi, params = %{"type" => "new_user"}), do: NewUser.perform(multi, params)
       def perform(multi, params = %{"type" => "sync_crm"}), do: SyncCRM.perform(multi, params)
   """
-  @callback perform(multi :: Multi.t(), params :: map) :: any()
+  @callback perform(multi :: Multi.t(), params :: map) ::
+              {:ok, any()}
+              | {:error, any()}
+              | {:error, Ecto.Multi.name(), any(), %{required(Ecto.Multi.name()) => any()}}
 
   defmacro __using__(opts) do
     table_name = Keyword.fetch!(opts, :table_name)
@@ -207,7 +213,7 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs in the `"SCHEDULED"` state with scheduled time <= now to `"AVAILABLE"` state.
+  Updates all jobs in the `"SCHEDULED"` and `"RETRY"` state with scheduled time <= now to `"AVAILABLE"` state.
 
   Returns the number of jobs updated.
   """
@@ -217,7 +223,7 @@ defmodule EctoJob.JobQueue do
       repo.update_all(
         Query.from(
           job in schema,
-          where: job.state == "SCHEDULED",
+          where: job.state in ["SCHEDULED", "RETRY"],
           where: job.schedule <= ^now
         ),
         set: [state: "AVAILABLE", updated_at: now]
@@ -339,7 +345,7 @@ defmodule EctoJob.JobQueue do
         set: [
           attempt: job.attempt + 1,
           state: "IN_PROGRESS",
-          expires: progress_expiry(now, job.attempt + 1, timeout_ms),
+          expires: increase_time(now, job.attempt + 1, timeout_ms),
           updated_at: now
         ]
       )
@@ -351,10 +357,44 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter.
+  Transitions a job from `"IN_PROGRESS"` to `"RETRY" or "FAILED" after execution failure.
+
+  If the job has exceeded the configured `max_attempts` the state will move to "FAILED",
+  otherwise the state is transitioned to `"RETRY"` and changes the schedule time so the
+  job will be picked up again.
   """
-  @spec progress_expiry(DateTime.t(), integer, integer) :: DateTime.t()
-  def progress_expiry(now = %DateTime{}, attempt, timeout_ms) do
+  @spec job_failed(repo, job, DateTime.t(), integer) :: {:ok, job} | :error
+  def job_failed(repo, job = %schema{}, now, retry_timeout_ms) do
+    updates =
+      if job.attempt >= job.max_attempts do
+        [state: "FAILED", expires: nil]
+      else
+        [state: "RETRY", schedule: increase_time(now, job.attempt + 1, retry_timeout_ms)]
+      end
+
+    {count, results} =
+      repo.update_all(
+        Query.from(
+          j in schema,
+          where: j.id == ^job.id,
+          where: j.state == "IN_PROGRESS",
+          where: j.attempt == ^job.attempt,
+          select: j
+        ),
+        set: updates
+      )
+
+    case {count, results} do
+      {0, _} -> :error
+      {1, [job]} -> {:ok, job}
+    end
+  end
+
+  @doc """
+  Computes the expiry time for an `"IN_PROGRESS"` and schedule time of "RETRY" jobs based on the current time and attempt counter.
+  """
+  @spec increase_time(DateTime.t(), integer, integer) :: DateTime.t()
+  def increase_time(now = %DateTime{}, attempt, timeout_ms) do
     timeout_ms |> Kernel.*(attempt) |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 

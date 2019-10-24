@@ -9,7 +9,7 @@ config :ecto_job_demo, ecto_repos: [EctoJobDemo.Repo]
 config :ecto_job_demo, EctoJobDemo.Repo,
   adapter: Ecto.Adapters.Postgres,
   username: "postgres",
-  password: "postgres",
+  password: "password",
   database: "ecto_job_demo",
   hostname: "localhost",
   pool_size: 10

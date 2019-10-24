@@ -13,7 +13,11 @@ Lower numbers run first, the default value is 0.
 
 Thanks to [ramondelemos](https://github.com/ramondelemos) for contibuting this feature!
 
-### Migrating
+[#45](https://github.com/mbuhot/ecto_job/pull/45) - [gabriel128](https://github.com/gabriel128) Failed jobs will retry before the full `execution_timeout` when an error occurs. By default the first retry will occur 30 seconds after failure.
+
+Thanks to [gabriel128](https://github.com/gabriel128) for contributing this feature!
+
+### Migrating to 3.0
 
 To upgrade to version 3.0 you must add a migration to update the pre-existent job queue tables:
 

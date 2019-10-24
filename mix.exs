@@ -55,13 +55,13 @@ defmodule EctoJob.Mixfile do
 
   defp deps do
     [
-      {:ecto_sql, github: "elixir-ecto/ecto_sql"},
-      {:postgrex, "~> 0.14"},
+      {:ecto_sql, "~> 3.2"},
+      {:postgrex, "~> 0.15"},
       {:jason, "~> 1.0"},
       {:gen_stage, "~> 0.14"},
       {:credo, "~> 1.0", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.6", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.0.0-rc.7", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:inch_ex, "~> 2.0", only: :dev, runtime: false}
     ]
   end

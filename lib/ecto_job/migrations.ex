@@ -65,12 +65,14 @@ defmodule EctoJob.Migrations do
     ## Options
 
     * `:prefix` - the prefix (aka Postgresql schema) to create the table in.
+    * `:version` - the major version of the EctoJob library used to generate the table
     * `:timestamps` - A keyword list of options passed to the `Ecto.Migration.timestamps/1` function.
     """
     def up(name, opts \\ []) do
       opts = [{:primary_key, false} | opts]
       prefix = Keyword.get(opts, :prefix)
       timestamp_opts = Keyword.get(opts, :timestamps, [])
+      version = Keyword.get(opts, :version, 2)
 
       _ =
         create table(name, opts) do
@@ -87,11 +89,18 @@ defmodule EctoJob.Migrations do
           add(:max_attempts, :integer, null: false, default: 5)
           add(:params, :map, null: false)
           add(:notify, :string)
-          add(:priority, :integer, null: false, default: 0)
+          if version >= 3 do
+            add(:priority, :integer, null: false, default: 0)
+          end
           timestamps(timestamp_opts)
         end
 
-      create(index(name, [:priority, :schedule, :id]))
+      case version do
+        2 ->
+          create(index(name, [:schedule, :id]))
+        3 ->
+          create(index(name, [:priority, :schedule, :id]))
+      end
 
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}

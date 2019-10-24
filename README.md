@@ -39,9 +39,11 @@ mix ecto.gen.migration create_job_queue
 defmodule MyApp.Repo.Migrations.CreateJobQueue do
   use Ecto.Migration
 
+  @ecto_job_version 3
+
   def up do
     EctoJob.Migrations.Install.up()
-    EctoJob.Migrations.CreateJobTable.up("jobs")
+    EctoJob.Migrations.CreateJobTable.up("jobs", version: @ecto_job_version)
   end
 
   def down do
@@ -51,9 +53,9 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
 end
 ```
 
-### Upgrading pre-existent Ecto Job to 3.0 version
+### Upgrading to version 3.0
 
-To upgrade your project to 3.0 version of ecto job you must add a migration to update the pre-existent job queue tables:
+To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
 
 ```
 mix ecto.gen.migration update_job_queue
@@ -62,11 +64,13 @@ mix ecto.gen.migration update_job_queue
 ```elixir
 defmodule MyApp.Repo.Migrations.UpdateJobQueue do
   use Ecto.Migration
+  @ecto_job_version 3
+
   def up do
-    EctoJob.Migrations.UpdateJobTable.up(3, "jobs")
+    EctoJob.Migrations.UpdateJobTable.up(@ecto_job_version, "jobs")
   end
   def down do
-    EctoJob.Migrations.UpdateJobTable.down(3, "jobs")
+    EctoJob.Migrations.UpdateJobTable.down(@ecto_job_version, "jobs")
   end
 end
 ```

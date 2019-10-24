@@ -1,3 +1,41 @@
+# 3.0.0
+
+Version 3.0 adds support for prioritizing jobs within each job queue.
+The `priority` option can be given when creating a Job:
+
+```elixir
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2)
+|> MyApp.Repo.insert()
+```
+
+Lower numbers run first, the default value is 0.
+
+Thanks to [ramondelemos](https://github.com/ramondelemos) for contibuting this feature!
+
+### Migrating
+
+To upgrade to version 3.0 you must add a migration to update the pre-existent job queue tables:
+
+```
+mix ecto.gen.migration update_job_queue
+```
+
+```elixir
+defmodule MyApp.Repo.Migrations.UpdateJobQueue do
+  use Ecto.Migration
+  @ecto_job_version 3
+
+  def up do
+    EctoJob.Migrations.UpdateJobTable.up(@ecto_job_version, "jobs")
+  end
+  def down do
+    EctoJob.Migrations.UpdateJobTable.down(@ecto_job_version, "jobs")
+  end
+end
+```
+
+
 # 2.1.0
 
 Version 2.1 add support for requeing jobs, fixes to the job reservation algorithm and dialyzer warnings.

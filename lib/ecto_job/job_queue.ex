@@ -156,6 +156,7 @@ defmodule EctoJob.JobQueue do
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
        - `:priority` (integer): lower numbers run first; default is 0
+       - `:notify` (string): payload to use for Postgres notification upon job completion
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do

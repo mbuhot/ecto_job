@@ -12,7 +12,7 @@ defmodule EctoJob.WorkerSupervisor do
    - `config` : The JobQueue configuration, used for Repo, Logging options
    - `subscribe_opts` : Should contain [{producer_name, max_demand: max_demand}]
   """
-  @spec start_link(config: Config.t, subscribe_to: Keyword.t()) :: Supervisor.on_start()
+  @spec start_link(config: Config.t(), subscribe_to: Keyword.t()) :: Supervisor.on_start()
   def start_link(config: config, subscribe_to: subscribe_opts) do
     children = [
       worker(Worker, [config], restart: :temporary)

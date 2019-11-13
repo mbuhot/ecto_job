@@ -287,7 +287,9 @@ defmodule EctoJob.JobQueue do
     |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
     |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
     |> Query.select([job], job)
-    |> repo.update_all(set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now])
+    |> repo.update_all(
+      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+    )
   end
 
   @doc """
@@ -364,7 +366,7 @@ defmodule EctoJob.JobQueue do
   otherwise the state is transitioned to `"RETRY"` and changes the schedule time so the
   job will be picked up again.
   """
-  @spec job_failed(repo, job, DateTime.t(), integer) :: {:ok, job} | :error
+  @spec job_failed(repo(), job(), DateTime.t(), integer) :: {:ok, job} | :error
   def job_failed(repo, job = %schema{}, now, retry_timeout_ms) do
     updates =
       if job.attempt >= job.max_attempts do
@@ -386,8 +388,12 @@ defmodule EctoJob.JobQueue do
       )
 
     case {count, results} do
-      {0, _} -> :error
-      {1, [job]} -> {:ok, job}
+      {0, _} ->
+        :error
+
+      {1, [job]} ->
+        notify_failed(repo, job, updates)
+        {:ok, job}
     end
   end
 
@@ -425,5 +431,31 @@ defmodule EctoJob.JobQueue do
     |> DateTime.to_unix()
     |> Kernel.+(seconds)
     |> DateTime.from_unix!()
+  end
+
+  @spec notify_failed(repo(), job(), Keyword.t()) :: :ok
+  defp notify_failed(_repo, _job = %{notify: nil}, _updates), do: :ok
+
+  defp notify_failed(
+         repo,
+         job = %{notify: _payload},
+         _updates = [state: "RETRY", schedule: _]
+       ) do
+    do_notify_failed(repo, job, "retry")
+  end
+
+  defp notify_failed(
+         repo,
+         job = %{notify: _payload},
+         _updates = [state: "FAILED", expires: _]
+       ) do
+    do_notify_failed(repo, job, "failed")
+  end
+
+  @spec do_notify_failed(repo(), job(), binary()) :: :ok
+  defp do_notify_failed(repo, _job = %queue{notify: payload}, event) do
+    topic = queue.__schema__(:source) <> "." <> event
+    repo.query("SELECT pg_notify($1, $2)", [topic, payload])
+    :ok
   end
 end

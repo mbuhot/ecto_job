@@ -286,7 +286,9 @@ defmodule EctoJob.JobQueue do
     |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
     |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
     |> Query.select([job], job)
-    |> repo.update_all(set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now])
+    |> repo.update_all(
+      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+    )
   end
 
   @doc """

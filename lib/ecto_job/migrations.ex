@@ -89,9 +89,11 @@ defmodule EctoJob.Migrations do
           add(:max_attempts, :integer, null: false, default: 5)
           add(:params, :map, null: false)
           add(:notify, :string)
+
           if version >= 3 do
             add(:priority, :integer, null: false, default: 0)
           end
+
           timestamps(timestamp_opts)
         end
 
@@ -99,6 +101,7 @@ defmodule EctoJob.Migrations do
         case version do
           2 ->
             create(index(name, [:schedule, :id]))
+
           3 ->
             create(index(name, [:priority, :schedule, :id]))
         end

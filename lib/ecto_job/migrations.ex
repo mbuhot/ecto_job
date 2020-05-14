@@ -99,6 +99,9 @@ defmodule EctoJob.Migrations do
 
       _ =
         case version do
+          1 ->
+            nil
+
           2 ->
             create(index(name, [:schedule, :id]))
 

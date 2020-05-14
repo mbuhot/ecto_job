@@ -36,6 +36,7 @@ defmodule EctoJob.JobQueue do
    - `"AVAILABLE"`: The job is availble to be run by the next available worker
    - `"RESERVED"`: The job has been reserved by a worker for execution
    - `"IN_PROGRESS"`: The job is currently being worked
+   - `"RETRY"`: The job has failed and it's waiting for a retry
    - `"FAILED"`: The job has exceeded the `max_attempts` and will not be retried again
   """
   @type state :: String.t()
@@ -45,14 +46,16 @@ defmodule EctoJob.JobQueue do
   """
   @type job :: %{
           __struct__: module,
+          __meta__: Ecto.Schema.Metadata.t(),
           id: integer | nil,
           state: state,
           expires: DateTime.t() | nil,
           schedule: DateTime.t() | nil,
-          attempt: integer(),
+          attempt: integer,
           max_attempts: integer | nil,
           params: map(),
           notify: String.t() | nil,
+          priority: integer,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -60,13 +63,18 @@ defmodule EctoJob.JobQueue do
   @doc """
   Job execution callback to be implemented by each `JobQueue` module.
 
+  The return type is the same as `Ecto.Repo.transaction/1`.
+
   ## Example
 
       @impl true
       def perform(multi, params = %{"type" => "new_user"}), do: NewUser.perform(multi, params)
       def perform(multi, params = %{"type" => "sync_crm"}), do: SyncCRM.perform(multi, params)
   """
-  @callback perform(multi :: Multi.t(), params :: map) :: any()
+  @callback perform(multi :: Multi.t(), params :: map) ::
+              {:ok, any()}
+              | {:error, any()}
+              | {:error, Ecto.Multi.name(), any(), %{required(Ecto.Multi.name()) => any()}}
 
   defmacro __using__(opts) do
     table_name = Keyword.fetch!(opts, :table_name)
@@ -104,6 +112,8 @@ defmodule EctoJob.JobQueue do
         field(:params, :map)
         # Payload used to notify that job has completed
         field(:notify, :string)
+        # Used to prioritize the job execution
+        field(:priority, :integer)
         timestamps()
       end
 
@@ -145,6 +155,8 @@ defmodule EctoJob.JobQueue do
 
        - `:schedule` : runs the job at the given `%DateTime{}`
        - `:max_attempts` : the maximum attempts for this job
+       - `:priority` (integer): lower numbers run first; default is 0
+       - `:notify` (string): payload to use for Postgres notification upon job completion
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
@@ -155,7 +167,8 @@ defmodule EctoJob.JobQueue do
           attempt: 0,
           max_attempts: opts[:max_attempts],
           params: params,
-          notify: opts[:notify]
+          notify: opts[:notify],
+          priority: Keyword.get(opts, :priority, 0)
         }
       end
 
@@ -189,10 +202,11 @@ defmodule EctoJob.JobQueue do
           |> MyApp.Job.requeue("requeue_job", failed_job)
           |> MyApp.Repo.transaction()
       """
-      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) :: Multi.t() | {:error, :non_failed_job}
+      @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) ::
+              Multi.t() | {:error, :non_failed_job}
       def requeue(multi, name, job = %__MODULE__{state: "FAILED"}) do
-          job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
-          Multi.update(multi, name, job_to_requeue)
+        job_to_requeue = Changeset.change(job, %{state: "SCHEDULED", attempt: 0, expires: nil})
+        Multi.update(multi, name, job_to_requeue)
       end
 
       def requeue(_, _, _), do: {:error, :non_failed_job}
@@ -200,7 +214,7 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Updates all jobs in the `"SCHEDULED"` state with scheduled time <= now to `"AVAILABLE"` state.
+  Updates all jobs in the `"SCHEDULED"` and `"RETRY"` state with scheduled time <= now to `"AVAILABLE"` state.
 
   Returns the number of jobs updated.
   """
@@ -210,7 +224,7 @@ defmodule EctoJob.JobQueue do
       repo.update_all(
         Query.from(
           job in schema,
-          where: job.state == "SCHEDULED",
+          where: job.state in ["SCHEDULED", "RETRY"],
           where: job.schedule <= ^now
         ),
         set: [state: "AVAILABLE", updated_at: now]
@@ -269,8 +283,11 @@ defmodule EctoJob.JobQueue do
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
-    repo.update_all(
-      available_jobs(schema, demand),
+    schema
+    |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
+    |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
+    |> Query.select([job], job)
+    |> repo.update_all(
       set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
     )
   end
@@ -282,18 +299,14 @@ defmodule EctoJob.JobQueue do
   """
   @spec available_jobs(schema, integer) :: Ecto.Query.t()
   def available_jobs(schema, demand) do
-    query =
-      Query.from(
-        job in schema,
-        where: job.state == "AVAILABLE",
-        order_by: [asc: job.schedule, asc: job.id],
-        lock: "FOR UPDATE SKIP LOCKED",
-        limit: ^demand,
-        select: [:id]
-      )
-
-    # Ecto doesn't support subquery in where clause, so use join as workaround
-    Query.from(job in schema, join: x in subquery(query), on: job.id == x.id, select: job)
+    Query.from(
+      job in schema,
+      where: job.state == "AVAILABLE",
+      order_by: [asc: job.priority, asc: job.schedule, asc: job.id],
+      lock: "FOR UPDATE SKIP LOCKED",
+      limit: ^demand,
+      select: %{id: job.id}
+    )
   end
 
   @doc """
@@ -335,7 +348,7 @@ defmodule EctoJob.JobQueue do
         set: [
           attempt: job.attempt + 1,
           state: "IN_PROGRESS",
-          expires: progress_expiry(now, job.attempt + 1, timeout_ms),
+          expires: increase_time(now, job.attempt + 1, timeout_ms),
           updated_at: now
         ]
       )
@@ -347,10 +360,48 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
-  Computes the expiry time for an `"IN_PROGRESS"` job based on the current time and attempt counter.
+  Transitions a job from `"IN_PROGRESS"` to `"RETRY" or "FAILED" after execution failure.
+
+  If the job has exceeded the configured `max_attempts` the state will move to "FAILED",
+  otherwise the state is transitioned to `"RETRY"` and changes the schedule time so the
+  job will be picked up again.
   """
-  @spec progress_expiry(DateTime.t(), integer, integer) :: DateTime.t()
-  def progress_expiry(now = %DateTime{}, attempt, timeout_ms) do
+  @spec job_failed(repo(), job(), DateTime.t(), integer) :: {:ok, job} | :error
+  def job_failed(repo, job = %schema{}, now, retry_timeout_ms) do
+    updates =
+      if job.attempt >= job.max_attempts do
+        [state: "FAILED", expires: nil]
+      else
+        [state: "RETRY", schedule: increase_time(now, job.attempt + 1, retry_timeout_ms)]
+      end
+
+    {count, results} =
+      repo.update_all(
+        Query.from(
+          j in schema,
+          where: j.id == ^job.id,
+          where: j.state == "IN_PROGRESS",
+          where: j.attempt == ^job.attempt,
+          select: j
+        ),
+        set: updates
+      )
+
+    case {count, results} do
+      {0, _} ->
+        :error
+
+      {1, [job]} ->
+        notify_failed(repo, job, updates)
+        {:ok, job}
+    end
+  end
+
+  @doc """
+  Computes the expiry time for an `"IN_PROGRESS"` and schedule time of "RETRY" jobs based on the current time and attempt counter.
+  """
+  @spec increase_time(DateTime.t(), integer, integer) :: DateTime.t()
+  def increase_time(now = %DateTime{}, attempt, timeout_ms) do
     timeout_ms |> Kernel.*(attempt) |> Integer.floor_div(1000) |> advance_seconds(now)
   end
 
@@ -380,5 +431,31 @@ defmodule EctoJob.JobQueue do
     |> DateTime.to_unix()
     |> Kernel.+(seconds)
     |> DateTime.from_unix!()
+  end
+
+  @spec notify_failed(repo(), job(), Keyword.t()) :: :ok
+  defp notify_failed(_repo, _job = %{notify: nil}, _updates), do: :ok
+
+  defp notify_failed(
+         repo,
+         job = %{notify: _payload},
+         _updates = [state: "RETRY", schedule: _]
+       ) do
+    do_notify_failed(repo, job, "retry")
+  end
+
+  defp notify_failed(
+         repo,
+         job = %{notify: _payload},
+         _updates = [state: "FAILED", expires: _]
+       ) do
+    do_notify_failed(repo, job, "failed")
+  end
+
+  @spec do_notify_failed(repo(), job(), binary()) :: :ok
+  defp do_notify_failed(repo, _job = %queue{notify: payload}, event) do
+    topic = queue.__schema__(:source) <> "." <> event
+    repo.query("SELECT pg_notify($1, $2)", [topic, payload])
+    :ok
   end
 end

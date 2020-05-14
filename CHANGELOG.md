@@ -1,3 +1,75 @@
+# 3.0.0
+
+Version 3.0 adds support for prioritizing jobs within each job queue.
+The `priority` option can be given when creating a Job:
+
+```elixir
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2)
+|> MyApp.Repo.insert()
+```
+
+Lower numbers run first, the default value is 0.
+
+Thanks to [ramondelemos](https://github.com/ramondelemos) for contibuting this feature!
+
+[#45](https://github.com/mbuhot/ecto_job/pull/45) - [gabriel128](https://github.com/gabriel128) Failed jobs will retry before the full `execution_timeout` when an error occurs. By default the first retry will occur 30 seconds after failure.
+
+Thanks to [gabriel128](https://github.com/gabriel128) for contributing this feature!
+
+### Migrating to 3.0
+
+To upgrade to version 3.0 you must add a migration to update the pre-existent job queue tables:
+
+```
+mix ecto.gen.migration update_job_queue
+```
+
+```elixir
+defmodule MyApp.Repo.Migrations.UpdateJobQueue do
+  use Ecto.Migration
+  @ecto_job_version 3
+
+  def up do
+    EctoJob.Migrations.UpdateJobTable.up(@ecto_job_version, "jobs")
+  end
+  def down do
+    EctoJob.Migrations.UpdateJobTable.down(@ecto_job_version, "jobs")
+  end
+end
+```
+
+
+# 2.1.0
+
+Version 2.1 add support for requeing jobs, fixes to the job reservation algorithm and dialyzer warnings.
+
+[#34](https://github.com/mbuhot/ecto_job/pull/34) - [mkorszun](https://github.com/mkorszun) New API to requeue a failed job :
+
+Requeuing will:
+
+* set `state` to `SCHEDULED`
+* set `attempt` to `0`
+* set `expires` to `nil`
+
+```elixir
+Ecto.Multi.new()
+|> MyApp.Job.requeue("requeue_job", failed_job)
+|> MyApp.Repo.transaction()
+```
+
+[#43](https://github.com/mbuhot/ecto_job/pull/43) - [mbuhot](https://github.com/mbuhot), [seangeo](https://github.com/seangeo) - Fixed issue where too many rows would be locked, causing negative demand in GenStage producer. See [this document](https://github.com/feikesteenbergen/demos/blob/master/bugs/update_from_correlated.adoc) for additional details.
+
+[#41](https://github.com/mbuhot/ecto_job/pull/41) - [mbuhot](https://github.com/mbuhot) - Fixed dialyzer warnings in `JobQueue` modules
+
+[#42](https://github.com/mbuhot/ecto_job/pull/42) - [sneako](https://github.com/sneako) - Improved documentation
+
+
+[#48](https://github.com/mbuhot/ecto_job/pull/48) - [darksheik](https://github.com/darksheik) - Improved documentation
+
+Thankyou contributors!
+
+
 # 2.0.0
 
 EctoJob 2.0 adds support for Ecto 3.0.

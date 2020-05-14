@@ -27,6 +27,7 @@ defmodule EctoJob.JobQueueTest do
                  :max_attempts,
                  :params,
                  :notify,
+                 :priority,
                  :inserted_at,
                  :updated_at
                ]
@@ -48,6 +49,16 @@ defmodule EctoJob.JobQueueTest do
     test "Accepts a max_attempts option" do
       job = EctoJob.Test.JobQueue.new(%{}, max_attempts: 123)
       assert job.max_attempts == 123
+    end
+
+    test "Created with default priority value" do
+      job = EctoJob.Test.JobQueue.new(%{})
+      assert job.priority == 0
+    end
+
+    test "Accepts a priority option" do
+      job = EctoJob.Test.JobQueue.new(%{}, priority: 1)
+      assert job.priority == 1
     end
   end
 
@@ -75,17 +86,16 @@ defmodule EctoJob.JobQueueTest do
         |> Ecto.Multi.to_list()
 
       assert [
-        requeue_job:
-          {
-            :update,
-            %Ecto.Changeset{
-              action: :update,
-              data: %EctoJob.Test.JobQueue{},
-              changes: %{attempt: 0, state: "SCHEDULED"}
-            },
-            []
-          }
-      ] = multi
+               requeue_job: {
+                 :update,
+                 %Ecto.Changeset{
+                   action: :update,
+                   data: %EctoJob.Test.JobQueue{},
+                   changes: %{attempt: 0, state: "SCHEDULED"}
+                 },
+                 []
+               }
+             ] = multi
     end
 
     test "Returns an error when job status is not FAILED" do
@@ -135,6 +145,22 @@ defmodule EctoJob.JobQueueTest do
 
       assert count == 0
       assert Repo.get(EctoJob.Test.JobQueue, job.id).state == "RESERVED"
+    end
+
+    test "Updates a scheduled RETRY job to AVAILABLE" do
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:24:00.000000Z], "Etc/UTC")
+
+      %{id: id} =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "RETRY")
+        |> Map.put(:schedule, schedule)
+        |> Repo.insert!()
+
+      count = EctoJob.JobQueue.activate_scheduled_jobs(Repo, EctoJob.Test.JobQueue, now)
+
+      assert count == 1
+      assert Repo.get(EctoJob.Test.JobQueue, id).state == "AVAILABLE"
     end
   end
 
@@ -262,6 +288,40 @@ defmodule EctoJob.JobQueueTest do
 
       assert DateTime.compare(c.schedule, e.schedule) == :lt
     end
+
+    test "RESERVES available jobs with high priority first" do
+      high_priority = 1
+      low_priority = 2
+
+      for _ <- 1..3 do
+        Repo.insert!(EctoJob.Test.JobQueue.new(%{}, priority: low_priority))
+      end
+
+      for _ <- 1..3 do
+        Repo.insert!(EctoJob.Test.JobQueue.new(%{}, priority: high_priority))
+      end
+
+      reserve_jobs = fn demand ->
+        EctoJob.JobQueue.reserve_available_jobs(
+          Repo,
+          EctoJob.Test.JobQueue,
+          demand,
+          DateTime.utc_now(),
+          300_000
+        )
+      end
+
+      {3, high_priority_jobs} = reserve_jobs.(3)
+      {3, low_priority_jobs} = reserve_jobs.(3)
+
+      Enum.each(high_priority_jobs, fn job ->
+        assert job.priority == high_priority
+      end)
+
+      Enum.each(low_priority_jobs, fn job ->
+        assert job.priority == low_priority
+      end)
+    end
   end
 
   describe "JobQueue.update_job_in_progress" do
@@ -299,7 +359,7 @@ defmodule EctoJob.JobQueueTest do
 
       {:ok, new_job} = EctoJob.JobQueue.update_job_in_progress(Repo, job, now, timeout)
 
-      assert DateTime.diff(new_job.expires, now, :seconds) ==
+      assert DateTime.diff(new_job.expires, now, :second) ==
                Integer.floor_div(timeout * (attempt + 1), 1000)
     end
 
@@ -350,6 +410,66 @@ defmodule EctoJob.JobQueueTest do
           now,
           @default_timeout
         )
+    end
+  end
+
+  describe "JobQueue.job_failed" do
+    test "Does not update state if different than IN_PROGRESS" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "AVAILABLE")
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      assert :error = EctoJob.JobQueue.job_failed(Repo, job, now, @default_timeout)
+      assert job.state == "AVAILABLE"
+      assert job.attempt == 0
+    end
+
+    test "Moves from IN_PROGRESS to RETRY and increase the schedule" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "IN_PROGRESS")
+        |> Map.put(:attempt, 1)
+        |> Map.put(:schedule, schedule)
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      {:ok, new_job} = EctoJob.JobQueue.job_failed(Repo, job, now, @default_timeout)
+
+      assert new_job.state == "RETRY"
+      assert new_job.attempt == 1
+      assert DateTime.compare(expiry, new_job.expires) == :eq
+      assert DateTime.compare(schedule, new_job.schedule) == :lt
+      assert Repo.all(Query.from(EctoJob.Test.JobQueue, where: [state: "IN_PROGRESS"])) == []
+    end
+
+    test "Moves from IN_PROGRESS to FAILED after max attempts" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:20:00.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{}, max_attempts: 5)
+        |> Map.put(:state, "IN_PROGRESS")
+        |> Map.put(:attempt, 5)
+        |> Map.put(:schedule, schedule)
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      {:ok, new_job} = EctoJob.JobQueue.job_failed(Repo, job, now, @default_timeout)
+
+      assert new_job.state == "FAILED"
+      assert new_job.attempt == 5
+      assert DateTime.compare(schedule, new_job.schedule) == :eq
+      assert Repo.all(Query.from(EctoJob.Test.JobQueue, where: [state: "IN_PROGRESS"])) == []
     end
   end
 end

@@ -1,7 +1,7 @@
 defmodule EctoJob.Mixfile do
   use Mix.Project
 
-  @version "2.0.0"
+  @version "3.0.0"
   @url "https://github.com/mbuhot/ecto_job"
 
   def project do
@@ -9,7 +9,7 @@ defmodule EctoJob.Mixfile do
       app: :ecto_job,
       description: "A transactional job queue built with Ecto, PostgreSQL and GenStage.",
       version: @version,
-      elixir: "~> 1.6",
+      elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
       elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -39,10 +39,7 @@ defmodule EctoJob.Mixfile do
 
   defp dialyzer do
     [
-      plt_add_apps: [:mix],
-      plt_add_deps: :apps_direct,
-      flags: ["-Werror_handling", "-Wno_unused", "-Wunmatched_returns", "-Wunderspecs"],
-      remove_defaults: [:unknown]
+      flags: ["-Werror_handling", "-Wno_unused", "-Wunmatched_returns", "-Wunderspecs"]
     ]
   end
 
@@ -58,14 +55,14 @@ defmodule EctoJob.Mixfile do
 
   defp deps do
     [
-      {:ecto_sql, "~> 3.0"},
-      {:postgrex, "~> 0.14"},
+      {:ecto_sql, "~> 3.2"},
+      {:postgrex, "~> 0.15"},
       {:jason, "~> 1.0"},
-      {:gen_stage, "~> 0.13"},
+      {:gen_stage, "~> 0.14"},
       {:credo, "~> 1.0", only: :dev, runtime: false},
-      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
-      {:ex_doc, "~> 0.12", only: :dev, runtime: false},
-      {:inch_ex, ">= 0.4.0", only: :dev, runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.7", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:inch_ex, "~> 2.0", only: :dev, runtime: false}
     ]
   end
 end

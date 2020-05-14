@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 2.0"}
+  {:ecto_job, "~> 3.0"}
 ```
 
 ## Installation
@@ -39,14 +39,38 @@ mix ecto.gen.migration create_job_queue
 defmodule MyApp.Repo.Migrations.CreateJobQueue do
   use Ecto.Migration
 
+  @ecto_job_version 3
+
   def up do
     EctoJob.Migrations.Install.up()
-    EctoJob.Migrations.CreateJobTable.up("jobs")
+    EctoJob.Migrations.CreateJobTable.up("jobs", version: @ecto_job_version)
   end
 
   def down do
     EctoJob.Migrations.CreateJobTable.down("jobs")
     EctoJob.Migrations.Install.down()
+  end
+end
+```
+
+### Upgrading to version 3.0
+
+To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
+
+```
+mix ecto.gen.migration update_job_queue
+```
+
+```elixir
+defmodule MyApp.Repo.Migrations.UpdateJobQueue do
+  use Ecto.Migration
+  @ecto_job_version 3
+
+  def up do
+    EctoJob.Migrations.UpdateJobTable.up(@ecto_job_version, "jobs")
+  end
+  def down do
+    EctoJob.Migrations.UpdateJobTable.down(@ecto_job_version, "jobs")
   end
 end
 ```
@@ -103,6 +127,26 @@ A job can be inserted into the Repo directly by constructing a job with the `new
 |> MyApp.Repo.insert()
 ```
 
+A job can be inserted with optional params:
+
+- `:schedule` : runs the job at the given `%DateTime{}`. The default value is `DateTime.utc_now()`.
+- `:max_attempts` : the maximum attempts for this job. The default value is `5`.
+- `:priority` (integer): lower numbers run first; default is 0
+
+```elixir
+%{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(max_attempts: 10)
+|> MyApp.Repo.insert()
+
+%{"type" => "SendEmail", "address" => "mickel@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 1)
+|> MyApp.Repo.insert()
+
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2)
+|> MyApp.Repo.insert()
+```
+
 The primary benefit of `EctoJob` is the ability to enqueue and process jobs transactionally.
 To achieve this, a job can be added to an `Ecto.Multi`, along with other application updates, using the `enqueue/3` function:
 
@@ -125,7 +169,7 @@ defmodule MyApp.JobQueue do
 
   def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail", "recipient" => recipient, "body" => body}) do
     multi
-    |> Ecto.Multi.run(:send, fn _ -> EmailService.send(recipient, body) end)
+    |> Ecto.Multi.run(:send, fn _repo, _changes -> EmailService.send(recipient, body) end)
     |> Ecto.Multi.insert(:stats, %EmailSendStats{recipient: recipient})
     |> MyApp.Repo.transaction()
   end
@@ -138,9 +182,9 @@ When a queue handles multiple job types, it is useful to pattern match on the jo
 defmodule MyApp.JobQueue do
   use EctoJob.JobQueue, table_name: "jobs"
 
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail"},      do: MyApp.SendEmail.perform(multi, job)
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "CustomerReport"}, do: MyApp.CustomerReport.perform(multi, job)
-  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SyncWithCRM"},    do: MyApp.CRMSync.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SendEmail"}),      do: MyApp.SendEmail.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "CustomerReport"}), do: MyApp.CustomerReport.perform(multi, job)
+  def perform(multi = %Ecto.Multi{}, job = %{"type" => "SyncWithCRM"}),    do: MyApp.CRMSync.perform(multi, job)
   ...
 end
 ```
@@ -158,11 +202,18 @@ Control the time for which the job is reserved while waiting for a worker to pic
 config :ecto_job, :reservation_timeout, 15_000
 ```
 
-Control the timeout for job execution before a job will be made available for retry. Begins when job is picked up by worker. Keep in mind, for jobs that are expected to retry quickly, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
+Control the delay between retries following a job execution failure. Keep in mind, for jobs that are expected to retry quickly, any configured `retry_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `30_000` ms (30 seconds).
+
+```
+config :ecto_job, :retry_timeout, 30_000
+```
+
+Control the timeout for job execution before an "IN_PROGRESS" job is assumed to have failed. Begins when job is picked up by worker. Similarly to `retry_timeout`, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
 
 ```
 config :ecto_job, :execution_timeout, 300_000
 ```
+
 
 You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
@@ -208,7 +259,8 @@ Once a consumer is given a job, it increments the attempt counter and updates th
 If the job is being retried, the expiry will be initial timeout * the attempt counter.
 
 If successful, the consumer can delete the job from the queue using the preloaded multi passed to the `perform/2` job handler.
-If an exception is raised in the worker or a successful processing attempt fails to successfully commit the preloaded multi, the job is not deleted and remains in the "IN_PROGRESS" state until it expires.
+If an exception is raised in the worker or a successful processing attempt fails to successfully commit the preloaded multi, the job is transitioned to the "RETRY" state, scheduled to run again after `retry_timeout` * attempt counter.
+If the processes is killed or is otherwise unable to transition to "RETRY", it will remain in "IN_PROGRESS" until the `execution_timeout` expires.
 
 Jobs in the "RESERVED" or "IN_PROGRESS" state past the expiry time will be returned to the "AVAILABLE" state.
 

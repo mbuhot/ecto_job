@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 3.0"}
+  {:ecto_job, "~> 3.1"}
 ```
 
 ## Installation
@@ -144,7 +144,7 @@ or
 |> MyApp.Repo.insert()
 ```
 
-In this case the `params` field in the schema will by of the `:binary` type (`bytea` in the PostgreSQL table).
+In this case the `params` field in the schema will be of the `:binary` type (`bytea` in the PostgreSQL table).
 
 
 A job can be inserted with optional params:

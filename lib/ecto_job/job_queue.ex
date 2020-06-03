@@ -53,7 +53,7 @@ defmodule EctoJob.JobQueue do
           schedule: DateTime.t() | nil,
           attempt: integer,
           max_attempts: integer | nil,
-          params: map(),
+          params: map() | any(),
           notify: String.t() | nil,
           priority: integer,
           inserted_at: DateTime.t() | nil,
@@ -71,7 +71,7 @@ defmodule EctoJob.JobQueue do
       def perform(multi, params = %{"type" => "new_user"}), do: NewUser.perform(multi, params)
       def perform(multi, params = %{"type" => "sync_crm"}), do: SyncCRM.perform(multi, params)
   """
-  @callback perform(multi :: Multi.t(), params :: map) ::
+  @callback perform(multi :: Multi.t(), params :: map() | any()) ::
               {:ok, any()}
               | {:error, any()}
               | {:error, Ecto.Multi.name(), any(), %{required(Ecto.Multi.name()) => any()}}
@@ -80,11 +80,13 @@ defmodule EctoJob.JobQueue do
     table_name = Keyword.fetch!(opts, :table_name)
     schema_prefix = Keyword.get(opts, :schema_prefix)
     timestamps_opts = Keyword.get(opts, :timestamps_opts)
+    params_type = Keyword.get(opts, :params_type, :map)
 
     quote bind_quoted: [
             table_name: table_name,
             schema_prefix: schema_prefix,
-            timestamps_opts: timestamps_opts
+            timestamps_opts: timestamps_opts,
+            params_type: params_type
           ] do
       use Ecto.Schema
       @behaviour EctoJob.JobQueue
@@ -108,8 +110,8 @@ defmodule EctoJob.JobQueue do
         field(:attempt, :integer)
         # Maximum attempts before this job is FAILED
         field(:max_attempts, :integer)
-        # Job params, serialized as JSONB
-        field(:params, :map)
+        # Job params, serialized as JSONB or Elixir/Erlang term
+        field(:params, params_type)
         # Payload used to notify that job has completed
         field(:notify, :string)
         # Used to prioritize the job execution
@@ -149,7 +151,7 @@ defmodule EctoJob.JobQueue do
       @doc """
       Create a new `#{__MODULE__}` instance with the given job params.
 
-      Params will be serialized as JSON, so
+      Params will be serialized as JSON or Elixir/Erlang term, so
 
       Options:
 
@@ -158,15 +160,15 @@ defmodule EctoJob.JobQueue do
        - `:priority` (integer): lower numbers run first; default is 0
        - `:notify` (string): payload to use for Postgres notification upon job completion
       """
-      @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
-      def new(params = %{}, opts \\ []) do
+      @spec new(map() | any(), Keyword.t()) :: EctoJob.JobQueue.job()
+      def new(params, opts \\ []) do
         %__MODULE__{
           state: if(opts[:schedule], do: "SCHEDULED", else: "AVAILABLE"),
           expires: nil,
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
           attempt: 0,
           max_attempts: opts[:max_attempts],
-          params: params,
+          params: serialize_params(params, unquote(params_type)),
           notify: opts[:notify],
           priority: Keyword.get(opts, :priority, 0)
         }
@@ -210,6 +212,10 @@ defmodule EctoJob.JobQueue do
       end
 
       def requeue(_, _, _), do: {:error, :non_failed_job}
+
+      @spec serialize_params(map() | any(), atom()) :: map() | binary()
+      defp serialize_params(params, :binary), do: :erlang.term_to_binary(params)
+      defp serialize_params(params, :map), do: params
     end
   end
 
@@ -283,13 +289,16 @@ defmodule EctoJob.JobQueue do
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
-    schema
-    |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
-    |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
-    |> Query.select([job], job)
-    |> repo.update_all(
-      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
-    )
+    {count, jobs} =
+      schema
+      |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
+      |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
+      |> Query.select([job], job)
+      |> repo.update_all(
+        set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+      )
+
+    {count, deserialize_job_params(jobs)}
   end
 
   @doc """
@@ -355,7 +364,7 @@ defmodule EctoJob.JobQueue do
 
     case {count, results} do
       {0, _} -> {:error, :expired}
-      {1, [job]} -> {:ok, job}
+      {1, [job]} -> {:ok, deserialize_job_params(job)}
     end
   end
 
@@ -393,7 +402,7 @@ defmodule EctoJob.JobQueue do
 
       {1, [job]} ->
         notify_failed(repo, job, updates)
-        {:ok, job}
+        {:ok, deserialize_job_params(job)}
     end
   end
 
@@ -457,5 +466,16 @@ defmodule EctoJob.JobQueue do
     topic = queue.__schema__(:source) <> "." <> event
     repo.query("SELECT pg_notify($1, $2)", [topic, payload])
     :ok
+  end
+
+  defp deserialize_job_params(jobs) when is_list(jobs) do
+    for job <- jobs, do: deserialize_job_params(job)
+  end
+
+  defp deserialize_job_params(job = %schema{}) do
+    case schema.__schema__(:type, :params) do
+      :map -> job
+      :binary -> %{job | params: :erlang.binary_to_term(job.params)}
+    end
   end
 end

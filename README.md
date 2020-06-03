@@ -127,6 +127,26 @@ A job can be inserted into the Repo directly by constructing a job with the `new
 |> MyApp.Repo.insert()
 ```
 
+By default, the job is a map, which corresponds to the `params` field of the type `:map` in the queue schema
+(`jsonb` if seen in the PostgreSQL table).  It can also be any Elixir/Erlang term:
+
+```elixir
+{"SendEmail", "joe@gmail.com", "Welcome!"}
+|> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+or
+
+```elixir
+|> %MyStruct{}
+|> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+In this case the `params` field in the schema will by of the `:binary` type (`bytea` in the PostgreSQL table).
+
+
 A job can be inserted with optional params:
 
 - `:schedule` : runs the job at the given `%DateTime{}`. The default value is `DateTime.utc_now()`.

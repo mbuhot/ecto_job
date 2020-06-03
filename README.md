@@ -86,6 +86,8 @@ defmodule MyApp.Repo.Migrations.UpdateJobQueue do
 end
 ```
 
+
+
 Add a module for the queue, mix in `EctoJob.JobQueue`.
 This will declare an `Ecto.Schema` to use with the table created in the migration, and a `start_link` function allowing the worker supervision tree to be started conveniently.
 

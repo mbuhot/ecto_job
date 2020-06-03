@@ -24,7 +24,7 @@ A transactional job queue built with Ecto, PostgreSQL and GenStage
 Add `:ecto_job` to your `dependencies`
 
 ```elixir
-  {:ecto_job, "~> 3.0"}
+  {:ecto_job, "~> 4.0"}
 ```
 
 ## Installation
@@ -39,7 +39,7 @@ mix ecto.gen.migration create_job_queue
 defmodule MyApp.Repo.Migrations.CreateJobQueue do
   use Ecto.Migration
 
-  @ecto_job_version 3
+  @ecto_job_version 4
 
   def up do
     EctoJob.Migrations.Install.up()
@@ -53,9 +53,9 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
 end
 ```
 
-### Upgrading to version 3.0
+### Upgrading to version 4.0
 
-To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
+To upgrade your project to 4.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
 
 ```
 mix ecto.gen.migration update_job_queue
@@ -64,7 +64,7 @@ mix ecto.gen.migration update_job_queue
 ```elixir
 defmodule MyApp.Repo.Migrations.UpdateJobQueue do
   use Ecto.Migration
-  @ecto_job_version 3
+  @ecto_job_version 4
 
   def up do
     EctoJob.Migrations.UpdateJobTable.up(@ecto_job_version, "jobs")
@@ -131,7 +131,8 @@ A job can be inserted with optional params:
 
 - `:schedule` : runs the job at the given `%DateTime{}`. The default value is `DateTime.utc_now()`.
 - `:max_attempts` : the maximum attempts for this job. The default value is `5`.
-- `:priority` (integer): lower numbers run first; default is 0
+- `:priority` (integer): lower numbers run first; default is 0.
+- `:idempotency_key` (string): guarantees the existence of a single job with the same key; default is nil.
 
 ```elixir
 %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}
@@ -147,6 +148,18 @@ A job can be inserted with optional params:
 |> MyApp.Repo.insert()
 ```
 
+When using `:idempotency_key` is recomended configure the Repo options `on_conflict: :nothing, conflict_target: [:idempotency_key]` to do not throw erros from database:
+
+```elixir
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2, idempotency_key: "Welcome!")
+|> MyApp.Repo.insert(on_conflict: :nothing, conflict_target: [:idempotency_key])
+
+%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
+|> MyApp.JobQueue.new(priority: 2, max_attempts: 2, idempotency_key: "Welcome!")
+|> MyApp.Repo.insert(on_conflict: :nothing, conflict_target: [:idempotency_key])
+```
+
 The primary benefit of `EctoJob` is the ability to enqueue and process jobs transactionally.
 To achieve this, a job can be added to an `Ecto.Multi`, along with other application updates, using the `enqueue/3` function:
 
@@ -154,6 +167,16 @@ To achieve this, a job can be added to an `Ecto.Multi`, along with other applica
 Ecto.Multi.new()
 |> Ecto.Multi.insert(:add_user, User.insert_changeset(%{name: "Joe", email: "joe@gmail.com"}))
 |> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"})
+|> MyApp.Repo.transaction()
+```
+
+Using the `enqueue/3` function the `:idempotency_key` works as expected:
+
+```elixir
+Ecto.Multi.new()
+|> Ecto.Multi.insert(:add_user, User.insert_changeset(%{name: "Joe", email: "joe@gmail.com"}))
+|> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}, idempotency_key: "Welcome!")
+|> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}, idempotency_key: "Welcome!")
 |> MyApp.Repo.transaction()
 ```
 

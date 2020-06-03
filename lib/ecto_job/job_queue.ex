@@ -56,6 +56,7 @@ defmodule EctoJob.JobQueue do
           params: map(),
           notify: String.t() | nil,
           priority: integer,
+          idempotency_key: String.t() | nil,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -114,6 +115,8 @@ defmodule EctoJob.JobQueue do
         field(:notify, :string)
         # Used to prioritize the job execution
         field(:priority, :integer)
+        # Used to guarantees the existence of a single job with the same key
+        field(:idempotency_key, :string)
         timestamps()
       end
 
@@ -157,6 +160,7 @@ defmodule EctoJob.JobQueue do
        - `:max_attempts` : the maximum attempts for this job
        - `:priority` (integer): lower numbers run first; default is 0
        - `:notify` (string): payload to use for Postgres notification upon job completion
+       - `:idempotency_key` (string): guarantees the existence of a single job with the same key; default is nil
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
@@ -168,7 +172,8 @@ defmodule EctoJob.JobQueue do
           max_attempts: opts[:max_attempts],
           params: params,
           notify: opts[:notify],
-          priority: Keyword.get(opts, :priority, 0)
+          priority: Keyword.get(opts, :priority, 0),
+          idempotency_key: Keyword.get(opts, :idempotency_key)
         }
       end
 
@@ -186,7 +191,13 @@ defmodule EctoJob.JobQueue do
       """
       @spec enqueue(Multi.t(), term, map, Keyword.t()) :: Multi.t()
       def enqueue(multi, name, params, opts \\ []) do
-        Multi.insert(multi, name, new(params, opts))
+        Multi.insert(
+          multi,
+          name,
+          new(params, opts),
+          on_conflict: :nothing,
+          conflict_target: [:idempotency_key]
+        )
       end
 
       @doc """

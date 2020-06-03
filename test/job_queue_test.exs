@@ -28,6 +28,7 @@ defmodule EctoJob.JobQueueTest do
                  :params,
                  :notify,
                  :priority,
+                 :idempotency_key,
                  :inserted_at,
                  :updated_at
                ]
@@ -60,6 +61,16 @@ defmodule EctoJob.JobQueueTest do
       job = EctoJob.Test.JobQueue.new(%{}, priority: 1)
       assert job.priority == 1
     end
+
+    test "Created with default idempotency_key value" do
+      job = EctoJob.Test.JobQueue.new(%{})
+      assert job.idempotency_key == nil
+    end
+
+    test "Accepts a idempotency_key option" do
+      job = EctoJob.Test.JobQueue.new(%{}, idempotency_key: "1")
+      assert job.idempotency_key == "1"
+    end
   end
 
   describe "JobQueue.enqueue" do
@@ -71,8 +82,23 @@ defmodule EctoJob.JobQueueTest do
 
       assert [
                a_job:
-                 {:insert, %Ecto.Changeset{action: :insert, data: %EctoJob.Test.JobQueue{}}, []}
+                 {:insert, %Ecto.Changeset{action: :insert, data: %EctoJob.Test.JobQueue{}},
+                  [on_conflict: :nothing, conflict_target: [:idempotency_key]]}
              ] = multi
+    end
+
+    test "Enqueue just one job with the same idempotency_key" do
+      idempotency_key = "1"
+
+      Ecto.Multi.new()
+      |> EctoJob.Test.JobQueue.enqueue(:a_job, %{}, idempotency_key: idempotency_key)
+      |> EctoJob.Test.JobQueue.enqueue(:b_job, %{}, idempotency_key: idempotency_key)
+      |> EctoJob.Test.JobQueue.enqueue(:c_job, %{}, idempotency_key: idempotency_key)
+      |> Repo.transaction()
+
+      jobs = Repo.all(EctoJob.Test.JobQueue)
+
+      assert 1 == Enum.count(jobs)
     end
   end
 

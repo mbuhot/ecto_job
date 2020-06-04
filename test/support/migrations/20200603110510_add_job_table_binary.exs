@@ -16,7 +16,7 @@ defmodule EctoJob.Test.Repo.Migrations.AddJobTableBinary do
   end
 
   def down do
-    CreateJobTable.down("jobs", prefix: "parasm_binary")
+    CreateJobTable.down("jobs", prefix: "params_binary")
     Intall.down(prefix: "params_binary")
     execute("DROP SCHEMA \"params_binary\";")
   end

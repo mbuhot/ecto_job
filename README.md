@@ -151,12 +151,28 @@ A job can be inserted with optional params:
 When using `:idempotency_key` is recomended configure the Repo options `on_conflict: :nothing, conflict_target: [:idempotency_key]` to do not throw erros from database:
 
 ```elixir
-%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
-|> MyApp.JobQueue.new(priority: 2, max_attempts: 2, idempotency_key: "Welcome!")
+# Enqueue from POD A
+
+rate_limit = 5
+
+schedule =
+  NaiveDateTime.utc_now()
+  |> NaiveDateTime.add(rate_limit, :second)
+  
+%{"type" => "polling", "address" => "jonas@gmail.com"}
+|> MyApp.JobQueue.new(schedule: schedule, idempotency_key: "jonas@gmail.com")
 |> MyApp.Repo.insert(on_conflict: :nothing, conflict_target: [:idempotency_key])
 
-%{"type" => "SendEmail", "address" => "jonas@gmail.com", "body" => "Welcome!"}
-|> MyApp.JobQueue.new(priority: 2, max_attempts: 2, idempotency_key: "Welcome!")
+# Enqueue from POD B
+
+rate_limit = 5
+
+schedule =
+  NaiveDateTime.utc_now()
+  |> NaiveDateTime.add(rate_limit, :second)
+  
+%{"type" => "polling", "address" => "jonas@gmail.com"}
+|> MyApp.JobQueue.new(schedule: schedule, idempotency_key: "jonas@gmail.com")
 |> MyApp.Repo.insert(on_conflict: :nothing, conflict_target: [:idempotency_key])
 ```
 
@@ -170,13 +186,31 @@ Ecto.Multi.new()
 |> MyApp.Repo.transaction()
 ```
 
-Using the `enqueue/3` function the `:idempotency_key` works as expected:
+Using the `enqueue/3` function:
 
 ```elixir
+# Enqueue from POD A
+
+rate_limit = 5
+
+schedule =
+  NaiveDateTime.utc_now()
+  |> NaiveDateTime.add(rate_limit, :second)
+  
 Ecto.Multi.new()
-|> Ecto.Multi.insert(:add_user, User.insert_changeset(%{name: "Joe", email: "joe@gmail.com"}))
-|> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}, idempotency_key: "Welcome!")
-|> MyApp.JobQueue.enqueue(:email_job, %{"type" => "SendEmail", "address" => "joe@gmail.com", "body" => "Welcome!"}, idempotency_key: "Welcome!")
+|> MyApp.JobQueue.enqueue(:polling_job, %{"type" => "polling", "address" => "jonas@gmail.com"}, schedule: schedule, idempotency_key: "jonas@gmail.com")
+|> MyApp.Repo.transaction()
+
+# Enqueue from POD B
+
+rate_limit = 5
+
+schedule =
+  NaiveDateTime.utc_now()
+  |> NaiveDateTime.add(rate_limit, :second)
+
+Ecto.Multi.new()
+|> MyApp.JobQueue.enqueue(:polling_job, %{"type" => "polling", "address" => "jonas@gmail.com"}, schedule: schedule, idempotency_key: "jonas@gmail.com")
 |> MyApp.Repo.transaction()
 ```
 

@@ -29,6 +29,7 @@ defmodule EctoJob.JobQueueTest do
                  :notify,
                  :priority,
                  :idempotency_key,
+                 :retain_for,
                  :inserted_at,
                  :updated_at
                ]
@@ -70,6 +71,16 @@ defmodule EctoJob.JobQueueTest do
     test "Accepts a idempotency_key option" do
       job = EctoJob.Test.JobQueue.new(%{}, idempotency_key: "1")
       assert job.idempotency_key == "1"
+    end
+
+    test "Created with default retain_for value" do
+      job = EctoJob.Test.JobQueue.new(%{})
+      assert job.retain_for == 0
+    end
+
+    test "Accepts a retain_for option" do
+      job = EctoJob.Test.JobQueue.new(%{}, retain_for: 1)
+      assert job.retain_for == 1
     end
   end
 
@@ -496,6 +507,123 @@ defmodule EctoJob.JobQueueTest do
       assert new_job.attempt == 5
       assert DateTime.compare(schedule, new_job.schedule) == :eq
       assert Repo.all(Query.from(EctoJob.Test.JobQueue, where: [state: "IN_PROGRESS"])) == []
+    end
+  end
+
+  describe "JobQueue.delete_completed_jobs" do
+    test "Delete completed expired jobs" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:00:00.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:23:59.000000Z], "Etc/UTC")
+
+      %{}
+      |> EctoJob.Test.JobQueue.new()
+      |> Map.put(:state, "COMPLETED")
+      |> Map.put(:max_attempts, 5)
+      |> Map.put(:expires, expiry)
+      |> Repo.insert!()
+
+      count = EctoJob.JobQueue.delete_completed_jobs(Repo, EctoJob.Test.JobQueue, now)
+
+      assert count == 1
+
+      assert Repo.all(Query.from(EctoJob.Test.JobQueue)) == []
+    end
+
+    test "Does not delete completed jobs not expired" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:59.000000Z], "Etc/UTC")
+      now = DateTime.from_naive!(~N[2017-08-17T12:00:00.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "COMPLETED")
+        |> Map.put(:max_attempts, 5)
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      count = EctoJob.JobQueue.delete_completed_jobs(Repo, EctoJob.Test.JobQueue, now)
+
+      assert count == 0
+
+      assert Repo.all(Query.from(EctoJob.Test.JobQueue)) == [job]
+    end
+
+    [
+      "SCHEDULED",
+      "AVAILABLE",
+      "RESERVED",
+      "IN_PROGRESS",
+      "RETRY",
+      "FAILED"
+    ]
+    |> Enum.each(fn state ->
+      test "Does not delete jobs with state #{state}" do
+        expiry = DateTime.from_naive!(~N[2017-08-17T12:00:00.000000Z], "Etc/UTC")
+        now = DateTime.from_naive!(~N[2017-08-17T12:23:59.000000Z], "Etc/UTC")
+
+        job =
+          EctoJob.Test.JobQueue.new(%{})
+          |> Map.put(:state, unquote(state))
+          |> Map.put(:max_attempts, 5)
+          |> Map.put(:expires, expiry)
+          |> Repo.insert!()
+
+        count = EctoJob.JobQueue.delete_completed_jobs(Repo, EctoJob.Test.JobQueue, now)
+
+        assert count == 0
+
+        assert Repo.all(Query.from(EctoJob.Test.JobQueue)) == [job]
+      end
+    end)
+  end
+
+  describe "JoqQueue.initial_multi" do
+    test "Update job to COMPLETED" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "IN_PROGRESS")
+        |> Map.put(:schedule, schedule)
+        |> Map.put(:expires, expiry)
+        |> Repo.insert!()
+
+      complete_job_key = "complete_job_#{job.id}"
+
+      {:ok, %{^complete_job_key => new_job}} =
+        job
+        |> EctoJob.JobQueue.initial_multi()
+        |> Repo.transaction()
+
+      assert new_job.state == "COMPLETED"
+      assert new_job.attempt == 1
+      assert DateTime.compare(new_job.schedule, schedule) == :eq
+      assert DateTime.diff(new_job.expires, DateTime.utc_now()) <= 0
+    end
+
+    test "Update job to COMPLETED and increase expires" do
+      expiry = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+      schedule = DateTime.from_naive!(~N[2017-08-17T12:23:34.000000Z], "Etc/UTC")
+
+      job =
+        EctoJob.Test.JobQueue.new(%{})
+        |> Map.put(:state, "IN_PROGRESS")
+        |> Map.put(:expires, expiry)
+        |> Map.put(:schedule, schedule)
+        |> Map.put(:retain_for, :timer.seconds(60))
+        |> Repo.insert!()
+
+      complete_job_key = "complete_job_#{job.id}"
+
+      {:ok, %{^complete_job_key => new_job}} =
+        job
+        |> EctoJob.JobQueue.initial_multi()
+        |> Repo.transaction()
+
+      assert new_job.state == "COMPLETED"
+      assert new_job.attempt == 1
+      assert DateTime.compare(new_job.schedule, schedule) == :eq
+      assert DateTime.diff(new_job.expires, DateTime.utc_now()) >= 60
     end
   end
 end

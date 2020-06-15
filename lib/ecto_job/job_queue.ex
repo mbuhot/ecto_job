@@ -38,6 +38,7 @@ defmodule EctoJob.JobQueue do
    - `"IN_PROGRESS"`: The job is currently being worked
    - `"RETRY"`: The job has failed and it's waiting for a retry
    - `"FAILED"`: The job has exceeded the `max_attempts` and will not be retried again
+   - `"COMPLETED"`: The job has finished with success
   """
   @type state :: String.t()
 
@@ -57,6 +58,7 @@ defmodule EctoJob.JobQueue do
           notify: String.t() | nil,
           priority: integer,
           idempotency_key: String.t() | nil,
+          retain_for: integer,
           inserted_at: DateTime.t() | nil,
           updated_at: DateTime.t() | nil
         }
@@ -117,6 +119,8 @@ defmodule EctoJob.JobQueue do
         field(:priority, :integer)
         # Used to guarantees the existence of a single job with the same key
         field(:idempotency_key, :string)
+        # Used to specify the time in milliseconds to retain completed job on the database
+        field(:retain_for, :integer)
         timestamps()
       end
 
@@ -161,6 +165,7 @@ defmodule EctoJob.JobQueue do
        - `:priority` (integer): lower numbers run first; default is 0
        - `:notify` (string): payload to use for Postgres notification upon job completion
        - `:idempotency_key` (string): guarantees the existence of a single job with the same key; default is nil
+       - `:retain_for` (integer): time in milliseconds to retain the job on the database after completed; default is 0
       """
       @spec new(map, Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params = %{}, opts \\ []) do
@@ -173,7 +178,8 @@ defmodule EctoJob.JobQueue do
           params: params,
           notify: opts[:notify],
           priority: Keyword.get(opts, :priority, 0),
-          idempotency_key: Keyword.get(opts, :idempotency_key)
+          idempotency_key: Keyword.get(opts, :idempotency_key),
+          retain_for: Keyword.get(opts, :retain_for, 0)
         }
       end
 
@@ -266,6 +272,25 @@ defmodule EctoJob.JobQueue do
   end
 
   @doc """
+  Deletes all jobs in the `"COMPLETED"` state with expires time <= now.
+
+  Returns the number of jobs deleted.
+  """
+  @spec delete_completed_jobs(repo, schema, DateTime.t()) :: integer
+  def delete_completed_jobs(repo, schema, now = %DateTime{}) do
+    {count, _} =
+      repo.delete_all(
+        Query.from(
+          job in schema,
+          where: job.state == "COMPLETED",
+          where: job.expires <= ^now
+        )
+      )
+
+    count
+  end
+
+  @doc """
   Updates all jobs that have been attempted the maximum number of times to `"FAILED"`.
 
   Returns the number of jobs updated.
@@ -276,7 +301,7 @@ defmodule EctoJob.JobQueue do
       repo.update_all(
         Query.from(
           job in schema,
-          where: job.state in ["IN_PROGRESS"],
+          where: job.state == "IN_PROGRESS",
           where: job.attempt >= job.max_attempts,
           where: job.expires < ^now
         ),
@@ -424,16 +449,21 @@ defmodule EctoJob.JobQueue do
   @spec initial_multi(job) :: Multi.t()
   def initial_multi(job) do
     Multi.new()
-    |> Multi.delete("delete_job_#{job.id}", delete_job_changeset(job))
+    |> Multi.update("complete_job_#{job.id}", complete_job_changeset(job))
   end
 
   @doc """
-  Creates an `Ecto.Changeset` that will delete a job, confirming that the attempt counter hasn't been increased by another worker process.
+  Creates an `Ecto.Changeset` that will update a job to completed, confirming that the attempt counter hasn't been increased by another worker process.
   """
-  @spec delete_job_changeset(job) :: Changeset.t()
-  def delete_job_changeset(job) do
+  @spec complete_job_changeset(job) :: Changeset.t()
+  def complete_job_changeset(job) do
+    {:ok, expires} =
+      NaiveDateTime.utc_now()
+      |> NaiveDateTime.add(job.retain_for, :millisecond)
+      |> DateTime.from_naive("Etc/UTC")
+
     job
-    |> Changeset.change()
+    |> Changeset.change(state: "COMPLETED", expires: expires)
     |> Changeset.optimistic_lock(:attempt)
   end
 

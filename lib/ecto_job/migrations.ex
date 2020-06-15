@@ -72,7 +72,7 @@ defmodule EctoJob.Migrations do
       opts = [{:primary_key, false} | opts]
       prefix = Keyword.get(opts, :prefix)
       timestamp_opts = Keyword.get(opts, :timestamps, [])
-      version = Keyword.get(opts, :version, 2)
+      version = Keyword.get(opts, :version, 4)
 
       create table(name, opts) do
         add(:id, :bigserial, primary_key: true)
@@ -95,6 +95,7 @@ defmodule EctoJob.Migrations do
 
         if version >= 4 do
           add(:idempotency_key, :string)
+          add(:retain_for, :bigint, null: false, default: 0)
         end
 
         timestamps(timestamp_opts)
@@ -159,6 +160,7 @@ defmodule EctoJob.Migrations do
     def up(4, name) do
       alter table(name) do
         add(:idempotency_key, :string)
+        add(:retain_for, :bigint, null: false, default: 0)
       end
 
       create(unique_index(name, :idempotency_key))
@@ -180,6 +182,7 @@ defmodule EctoJob.Migrations do
 
       alter table(name) do
         remove(:idempotency_key)
+        remove(:retain_for)
       end
     end
   end

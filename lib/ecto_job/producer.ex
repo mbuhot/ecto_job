@@ -149,6 +149,7 @@ defmodule EctoJob.Producer do
   def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
     now = clock.()
     _ = JobQueue.fail_expired_jobs_at_max_attempts(repo, schema, now)
+    delete_completed_jobs(repo, schema, now)
     activate_jobs(repo, schema, now)
     dispatch_jobs(state, now)
   end
@@ -172,6 +173,12 @@ defmodule EctoJob.Producer do
       JobQueue.activate_expired_jobs(repo, schema, now)
   end
 
+  # Remove completed jobs, returning the number of jobs deleted
+  @spec delete_completed_jobs(repo, schema, DateTime.t()) :: integer
+  defp delete_completed_jobs(repo, schema, now = %DateTime{}) do
+    JobQueue.delete_completed_jobs(repo, schema, now)
+  end
+
   # Reserve jobs according to demand, and construct the GenState reply tuple
   # Short-circuit when zero demand
   @spec dispatch_jobs(State.t(), DateTime.t()) :: {:noreply, [JobQueue.job()], State.t()}
@@ -181,6 +188,7 @@ defmodule EctoJob.Producer do
 
   defp dispatch_jobs(state = %State{}, now) do
     %{repo: repo, schema: schema, demand: demand, reservation_timeout: timeout} = state
+    delete_completed_jobs(repo, schema, now)
     {count, jobs} = JobQueue.reserve_available_jobs(repo, schema, demand, now, timeout)
     {:noreply, jobs, %{state | demand: demand - count}}
   end

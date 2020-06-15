@@ -72,42 +72,49 @@ defmodule EctoJob.Migrations do
       opts = [{:primary_key, false} | opts]
       prefix = Keyword.get(opts, :prefix)
       timestamp_opts = Keyword.get(opts, :timestamps, [])
-      version = Keyword.get(opts, :version, 2)
+      version = Keyword.get(opts, :version, 4)
 
-      _ =
-        create table(name, opts) do
-          add(:id, :bigserial, primary_key: true)
-          add(:state, :string, null: false, default: "AVAILABLE")
-          add(:expires, :utc_datetime_usec)
+      create table(name, opts) do
+        add(:id, :bigserial, primary_key: true)
+        add(:state, :string, null: false, default: "AVAILABLE")
+        add(:expires, :utc_datetime_usec)
 
-          add(:schedule, :utc_datetime_usec,
-            null: false,
-            default: fragment("timezone('UTC', now())")
-          )
+        add(:schedule, :utc_datetime_usec,
+          null: false,
+          default: fragment("timezone('UTC', now())")
+        )
 
-          add(:attempt, :integer, null: false, default: 0)
-          add(:max_attempts, :integer, null: false, default: 5)
-          add(:params, :map, null: false)
-          add(:notify, :string)
+        add(:attempt, :integer, null: false, default: 0)
+        add(:max_attempts, :integer, null: false, default: 5)
+        add(:params, :map, null: false)
+        add(:notify, :string)
 
-          if version >= 3 do
-            add(:priority, :integer, null: false, default: 0)
-          end
-
-          timestamps(timestamp_opts)
+        if version >= 3 do
+          add(:priority, :integer, null: false, default: 0)
         end
 
-      _ =
-        case version do
-          1 ->
-            nil
-
-          2 ->
-            create(index(name, [:schedule, :id]))
-
-          3 ->
-            create(index(name, [:priority, :schedule, :id]))
+        if version >= 4 do
+          add(:idempotency_key, :string)
+          add(:retain_for, :bigint, null: false, default: 0)
         end
+
+        timestamps(timestamp_opts)
+      end
+
+      cond do
+        version == 2 ->
+          create(index(name, [:schedule, :id]))
+
+        version == 3 ->
+          create(index(name, [:priority, :schedule, :id]))
+
+        version >= 4 ->
+          create(index(name, [:priority, :schedule, :id]))
+          create(unique_index(name, :idempotency_key))
+
+        true ->
+          nil
+      end
 
       execute("""
       CREATE TRIGGER tr_notify_inserted_#{name}
@@ -150,14 +157,32 @@ defmodule EctoJob.Migrations do
       create(index(name, [:priority, :schedule, :id]))
     end
 
+    def up(4, name) do
+      alter table(name) do
+        add(:idempotency_key, :string)
+        add(:retain_for, :bigint, null: false, default: 0)
+      end
+
+      create(unique_index(name, :idempotency_key))
+    end
+
     @doc """
     Rollback updates from job queue table with the given ecto job version and name.
     """
     def down(3, name) do
-      _ = drop(index(name, [:priority, :schedule, :id]))
+      drop(index(name, [:priority, :schedule, :id]))
 
       alter table(name) do
         remove(:priority)
+      end
+    end
+
+    def down(4, name) do
+      drop(unique_index(name, :idempotency_key))
+
+      alter table(name) do
+        remove(:idempotency_key)
+        remove(:retain_for)
       end
     end
   end

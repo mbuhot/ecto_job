@@ -47,6 +47,7 @@ defmodule EctoJobPriorityDemo.JobMonitor do
             params: %{priority: priority},
             notify: nil,
             priority: priority,
+            retain_for: :timer.seconds(1),
             updated_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
             inserted_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
           }

@@ -2,7 +2,9 @@ defmodule EctoJob.Test.JobQueue do
   @moduledoc false
   use EctoJob.JobQueue, table_name: "jobs"
 
+  alias EctoJob.Test.Repo
+
   def perform(multi, _params) do
-    EctoJob.Test.Repo.transaction(multi)
+    Repo.transaction(multi)
   end
 end

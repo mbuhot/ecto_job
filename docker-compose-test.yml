@@ -9,3 +9,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=ecto_job_test
+
+  dockerize:
+    container_name: dockerize
+    image: jwilder/dockerize

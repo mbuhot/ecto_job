@@ -103,10 +103,10 @@ defmodule EctoJob.Migrations do
             nil
 
           2 ->
-            create(index(name, [:schedule, :id]))
+            create(index(name, [:schedule, :id], prefix: prefix))
 
           3 ->
-            create(index(name, [:priority, :schedule, :id]))
+            create(index(name, [:priority, :schedule, :id], prefix: prefix))
         end
 
       execute("""
@@ -142,21 +142,23 @@ defmodule EctoJob.Migrations do
     @doc """
     Upgrade the job queue table with the given ecto job version and name.
     """
-    def up(3, name) do
-      alter table(name) do
+    def up(3, name, opts \\ []) do
+      prefix = Keyword.get(opts, :prefix)
+      alter table(name, prefix: prefix) do
         add(:priority, :integer, null: false, default: 0)
       end
 
-      create(index(name, [:priority, :schedule, :id]))
+      create(index(name, [:priority, :schedule, :id], prefix: prefix))
     end
 
     @doc """
     Rollback updates from job queue table with the given ecto job version and name.
     """
-    def down(3, name) do
-      _ = drop(index(name, [:priority, :schedule, :id]))
+    def down(3, name, opts \\ []) do
+      prefix = Keyword.get(opts, :prefix)
+      _ = drop(index(name, [:priority, :schedule, :id], prefix: prefix))
 
-      alter table(name) do
+      alter table(name, prefix: prefix) do
         remove(:priority)
       end
     end

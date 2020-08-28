@@ -96,10 +96,7 @@ defmodule EctoJob.Migrations do
           add(:state, :string, null: false, default: "AVAILABLE")
           add(:expires, :utc_datetime_usec)
 
-          add(:schedule, :utc_datetime_usec,
-            null: false,
-            default: fragment_utc_now(adapter)
-          )
+          add(:schedule, :utc_datetime_usec, null: false, default: utc_now(adapter))
 
           add(:attempt, :integer, null: false, default: 0)
           add(:max_attempts, :integer, null: false, default: 5)
@@ -156,8 +153,8 @@ defmodule EctoJob.Migrations do
     ###
     ### Priv
     ###
-    defp fragment_utc_now(Ecto.Adapters.Postgres), do: fragment("timezone('UTC', now())")
-    defp fragment_utc_now(Ecto.Adapters.MyXQL), do: fragment("UTC_TIMESTAMP()")
+    defp utc_now(Ecto.Adapters.Postgres), do: fragment("timezone('UTC', now())")
+    defp utc_now(Ecto.Adapters.MyXQL), do: fragment("CURRENT_TIMESTAMP(6)")
   end
 
   defmodule UpdateJobTable do

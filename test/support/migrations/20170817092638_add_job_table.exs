@@ -11,6 +11,6 @@ defmodule EctoJob.Test.Repo.Migrations.AddJobTable do
 
   def down do
     CreateJobTable.down("jobs")
-    Intall.down()
+    Install.down()
   end
 end

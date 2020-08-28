@@ -19,3 +19,19 @@ if Mix.env() == :test do
 
   config :logger, level: :warn
 end
+
+if Mix.env() == :test_myxql do
+  config :ecto_job, EctoJob.Test.Repo,
+    adapter: Ecto.Adapters.MyXQL,
+    username: "mysql",
+    password: "password",
+    database: "ecto_job_test",
+    hostname: "localhost",
+    port: 13306,
+    pool: Ecto.Adapters.SQL.Sandbox,
+    priv: "test/support/"
+
+  config :ecto_job, ecto_repos: [EctoJob.Test.Repo]
+
+  config :logger, level: :warn
+end

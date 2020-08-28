@@ -21,10 +21,14 @@ defmodule EctoJob.Mixfile do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger] ++ extra_applications(Mix.env())]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp extra_applications(:test), do: [:postgrex]
+  defp extra_applications(:test_myxql), do: [:myxql]
+  defp extra_applications(_), do: []
+
+  defp elixirc_paths(test) when test in [:test, :test_myxql], do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp package do
@@ -56,7 +60,8 @@ defmodule EctoJob.Mixfile do
   defp deps do
     [
       {:ecto_sql, "~> 3.2"},
-      {:postgrex, "~> 0.15"},
+      {:postgrex, "~> 0.15", optional: true},
+      {:myxql, "~> 0.2", optional: true},
       {:jason, "~> 1.0"},
       {:gen_stage, "~> 1.0"},
       {:credo, "~> 1.0", only: :dev, runtime: false},

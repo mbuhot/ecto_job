@@ -53,6 +53,15 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
 end
 ```
 
+### Compatibility
+
+`EctoJob` leverages specific PostgreSQL features, like notification mechanism
+when inserting a new job into a queue.
+
+However, a non-optimized version of `EctoJob` can be used on top of MySQL >=
+8.0.1. Prior version of MySQL is not supported because of the following feature:
+* `FOR UPDATE SKIP LOCKED`
+
 ### Upgrading to version 3.0
 
 To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:

@@ -7,8 +7,11 @@ otp_release:
   - 21.3.8.1
   - 23.0.3
 
-addons:
-  postgresql: "9.6"
+env:
+  - MIX_ENV=test DB_URL=ecto://postgres:@localhost/ecto_job_test
+
+services:
+  - postgresql
 
 cache:
   directories:
@@ -18,16 +21,16 @@ cache:
 install:
   - mix local.hex --force
   - mix local.rebar --force
-  - mix deps.get
+  - MIX_ENV=dev mix deps.get
 
 before_script:
-  - mix clean
-  - MIX_ENV=test mix do ecto.create, ecto.migrate
+  - MIX_ENV=dev mix clean
+  - mix do ecto.create, ecto.migrate
 
 script:
   - mix test
-  - mix credo
-  - mix dialyzer
+  - MIX_ENV=dev mix credo
+  - MIX_ENV=dev mix dialyzer
 
 after_script:
-  - mix inch.report
+  - MIX_ENV=dev mix inch.report

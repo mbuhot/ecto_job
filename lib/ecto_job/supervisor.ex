@@ -45,27 +45,39 @@ defmodule EctoJob.Supervisor do
         }
       ) do
     supervisor_name = String.to_atom("#{schema}.Supervisor")
-    notifier_name = String.to_atom("#{schema}.Notifier")
     producer_name = String.to_atom("#{schema}.Producer")
 
-    children = [
-      worker(Postgrex.Notifications, [repo.config() ++ [name: notifier_name]]),
-      worker(Producer, [
+    {children, notifier_name} =
+      case repo.__adapter__() do
+        Ecto.Adapters.Postgres ->
+          notifier_name = String.to_atom("#{schema}.Notifier")
+
+          {[worker(Postgrex.Notifications, [repo.config() ++ [name: notifier_name]])],
+           notifier_name}
+
+        _ ->
+          {[], nil}
+      end
+
+    children =
+      children ++
         [
-          name: producer_name,
-          repo: repo,
-          schema: schema,
-          notifier: notifier_name,
-          poll_interval: poll_interval,
-          reservation_timeout: reservation_timeout,
-          execution_timeout: execution_timeout,
-          notifications_listen_timeout: notifications_listen_timeout
+          worker(Producer, [
+            [
+              name: producer_name,
+              repo: repo,
+              schema: schema,
+              notifier: notifier_name,
+              poll_interval: poll_interval,
+              reservation_timeout: reservation_timeout,
+              execution_timeout: execution_timeout,
+              notifications_listen_timeout: notifications_listen_timeout
+            ]
+          ]),
+          supervisor(WorkerSupervisor, [
+            [config: config, subscribe_to: [{producer_name, max_demand: max_demand}]]
+          ])
         ]
-      ]),
-      supervisor(WorkerSupervisor, [
-        [config: config, subscribe_to: [{producer_name, max_demand: max_demand}]]
-      ])
-    ]
 
     Supervisor.start_link(children, strategy: :rest_for_one, name: supervisor_name)
   end

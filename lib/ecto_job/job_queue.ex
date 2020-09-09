@@ -282,14 +282,8 @@ defmodule EctoJob.JobQueue do
   returns `{count, updated_jobs}` tuple.
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
-  def reserve_available_jobs(repo, schema, demand, now = %DateTime{}, timeout_ms) do
-    schema
-    |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
-    |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
-    |> Query.select([job], job)
-    |> repo.update_all(
-      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
-    )
+  def reserve_available_jobs(repo, schema, demand, now, timeout_ms) do
+    do_reserve_available_jobs(repo.__adapter__(), repo, schema, demand, now, timeout_ms)
   end
 
   @doc """
@@ -334,26 +328,8 @@ defmodule EctoJob.JobQueue do
   """
   @spec update_job_in_progress(repo, job, DateTime.t(), integer) ::
           {:ok, job} | {:error, :expired}
-  def update_job_in_progress(repo, job = %schema{}, now, timeout_ms) do
-    {count, results} =
-      repo.update_all(
-        Query.from(
-          j in schema,
-          where: j.id == ^job.id,
-          where: j.attempt == ^job.attempt,
-          where: j.state == "RESERVED",
-          where: j.expires >= ^now,
-          select: j
-        ),
-        set: [
-          attempt: job.attempt + 1,
-          state: "IN_PROGRESS",
-          expires: increase_time(now, job.attempt + 1, timeout_ms),
-          updated_at: now
-        ]
-      )
-
-    case {count, results} do
+  def update_job_in_progress(repo, job, now, timeout_ms) do
+    case do_update_job_in_progress(repo.__adapter__(), repo, job, now, timeout_ms) do
       {0, _} -> {:error, :expired}
       {1, [job]} -> {:ok, job}
     end
@@ -367,7 +343,7 @@ defmodule EctoJob.JobQueue do
   job will be picked up again.
   """
   @spec job_failed(repo(), job(), DateTime.t(), integer) :: {:ok, job} | :error
-  def job_failed(repo, job = %schema{}, now, retry_timeout_ms) do
+  def job_failed(repo, job, now, retry_timeout_ms) do
     updates =
       if job.attempt >= job.max_attempts do
         [state: "FAILED", expires: nil]
@@ -375,17 +351,7 @@ defmodule EctoJob.JobQueue do
         [state: "RETRY", schedule: increase_time(now, job.attempt + 1, retry_timeout_ms)]
       end
 
-    {count, results} =
-      repo.update_all(
-        Query.from(
-          j in schema,
-          where: j.id == ^job.id,
-          where: j.state == "IN_PROGRESS",
-          where: j.attempt == ^job.attempt,
-          select: j
-        ),
-        set: updates
-      )
+    {count, results} = do_job_failed(repo.__adapter__(), repo, job, updates)
 
     case {count, results} do
       {0, _} ->
@@ -457,5 +423,153 @@ defmodule EctoJob.JobQueue do
     topic = queue.__schema__(:source) <> "." <> event
     repo.query("SELECT pg_notify($1, $2)", [topic, payload])
     :ok
+  end
+
+  defp do_update_job_in_progress(
+         Ecto.Adapters.Postgres,
+         repo,
+         job = %schema{},
+         now,
+         timeout_ms
+       ) do
+    repo.update_all(
+      Query.from(
+        j in schema,
+        where: j.id == ^job.id,
+        where: j.attempt == ^job.attempt,
+        where: j.state == "RESERVED",
+        where: j.expires >= ^now,
+        select: j
+      ),
+      set: [
+        attempt: job.attempt + 1,
+        state: "IN_PROGRESS",
+        expires: increase_time(now, job.attempt + 1, timeout_ms),
+        updated_at: now
+      ]
+    )
+  end
+
+  defp do_update_job_in_progress(Ecto.Adapters.MyXQL, repo, job = %schema{}, now, timeout_ms) do
+    {:ok, {count, results}} =
+      repo.transaction(fn ->
+        {count, nil} =
+          repo.update_all(
+            Query.from(
+              j in schema,
+              where: j.id == ^job.id,
+              where: j.attempt == ^job.attempt,
+              where: j.state == "RESERVED",
+              where: j.expires >= ^now
+            ),
+            set: [
+              attempt: job.attempt + 1,
+              state: "IN_PROGRESS",
+              expires: increase_time(now, job.attempt + 1, timeout_ms),
+              updated_at: now
+            ]
+          )
+
+        results = repo.all(Query.from(j in schema, where: j.id == ^job.id, select: j))
+
+        {count, results}
+      end)
+
+    {count, results}
+  end
+
+  defp do_job_failed(Ecto.Adapters.Postgres, repo, job = %schema{}, updates) do
+    repo.update_all(
+      Query.from(
+        j in schema,
+        where: j.id == ^job.id,
+        where: j.state == "IN_PROGRESS",
+        where: j.attempt == ^job.attempt,
+        select: j
+      ),
+      set: updates
+    )
+  end
+
+  defp do_job_failed(Ecto.Adapters.MyXQL, repo, job = %schema{}, updates) do
+    {:ok, {count, results}} =
+      repo.transaction(fn ->
+        {count, nil} =
+          repo.update_all(
+            Query.from(
+              j in schema,
+              where: j.id == ^job.id,
+              where: j.state == "IN_PROGRESS",
+              where: j.attempt == ^job.attempt
+            ),
+            set: updates
+          )
+
+        results = repo.all(Query.from(j in schema, where: j.id == ^job.id, select: j))
+
+        {count, results}
+      end)
+
+    {count, results}
+  end
+
+  defp do_reserve_available_jobs(
+         Ecto.Adapters.Postgres,
+         repo,
+         schema,
+         demand,
+         now = %DateTime{},
+         timeout_ms
+       ) do
+    schema
+    |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
+    |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
+    |> Query.select([job], job)
+    |> repo.update_all(
+      set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+    )
+  end
+
+  defp do_reserve_available_jobs(
+         Ecto.Adapters.MyXQL,
+         repo,
+         schema,
+         demand,
+         now = %DateTime{},
+         timeout_ms
+       ) do
+    {:ok, {count, results}} =
+      repo.transaction(fn ->
+        ids =
+          schema
+          |> available_jobs(demand)
+          |> repo.all()
+          |> Enum.map(& &1.id)
+
+        {count, nil} =
+          repo.update_all(
+            Query.from(
+              j in schema,
+              where: j.id in ^ids
+            ),
+            set: [
+              state: "RESERVED",
+              expires: reservation_expiry(now, timeout_ms),
+              updated_at: now
+            ]
+          )
+
+        results =
+          Query.from(
+            j in schema,
+            where: j.id in ^ids,
+            select: j
+          )
+          |> repo.all()
+
+        {count, results}
+      end)
+
+    {count, results}
   end
 end

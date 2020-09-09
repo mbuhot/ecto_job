@@ -9,3 +9,14 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=ecto_job_test
+
+  ecto-job-test-mysql:
+    image: mysql:latest
+    ports:
+      - "13306:3306"
+    environment:
+      - MYSQL_USER=mysql
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=ecto_job_test
+      - MYSQL_ROOT_PASSWORD=mysql
+      - MYSQL_ROOT_HOST=%

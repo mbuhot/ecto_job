@@ -5,13 +5,22 @@
 # is restricted to this project.
 use Mix.Config
 
-if Mix.env() == :test do
+{adapter, default_url} =
+  case Mix.env() do
+    :test ->
+      {Ecto.Adapters.Postgres, "ecto://postgres:password@localhost/ecto_job_test"}
+
+    :test_myxql ->
+      {Ecto.Adapters.MyXQL, "ecto://root:mysql@localhost:13306/ecto_job_test"}
+
+    _ ->
+      {nil, nil}
+  end
+
+if adapter do
   config :ecto_job, EctoJob.Test.Repo,
-    adapter: Ecto.Adapters.Postgres,
-    username: "postgres",
-    password: "password",
-    database: "ecto_job_test",
-    hostname: "localhost",
+    adapter: adapter,
+    url: System.get_env("DB_URL", default_url),
     pool: Ecto.Adapters.SQL.Sandbox,
     priv: "test/support/"
 

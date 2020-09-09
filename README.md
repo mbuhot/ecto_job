@@ -6,7 +6,12 @@
 
 # EctoJob
 
-A transactional job queue built with Ecto, PostgreSQL and GenStage
+A transactional job queue built with Ecto and GenStage.
+
+It is compatible with Postgresql and Mysql with a major difference:
+* Postgresql: job queue updates are notified to ecto_job through Postgresql
+  notification feature.
+* MySQL: job queue updates are notified through database polling.
 
 ## Goals
 
@@ -52,6 +57,17 @@ defmodule MyApp.Repo.Migrations.CreateJobQueue do
   end
 end
 ```
+
+### Compatibility
+
+`EctoJob` leverages specific PostgreSQL features, like notification mechanism
+when inserting a new job into a queue.
+
+However, a non-optimized version of `EctoJob` can be used on top of MySQL >=
+8.0.1. Other version of MySQL / MariaDB may not be working because of the use of
+the following specific syntax:
+* `FOR UPDATE SKIP LOCKED`
+* Default value for datetime column
 
 ### Upgrading to version 3.0
 

@@ -122,7 +122,12 @@ defmodule EctoJob.Producer do
         }
       ) do
     _ = start_timer(poll_interval)
-    _ = start_listener(notifier, schema, notifications_listen_timeout)
+
+    _ =
+      if notifier do
+        start_listener(notifier, schema, notifications_listen_timeout)
+      end
+
     {:producer, state}
   end
 

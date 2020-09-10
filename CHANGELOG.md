@@ -1,3 +1,37 @@
+# 3.1.0
+
+Version 3.1.0 adds support for job params as an Elixir/Erlang term.
+You can insert any arbitrary Elixir/Erlang term into the queue:
+
+```elixir
+{"SendEmail", "jonas@gmail.com", "Welcome!"}
+|> MyApp.JobQueue.new()
+|> MyApp.Repo.insert()
+```
+
+You should use the option `:params_type` when defining your queue module:
+
+```elixir
+defmodule MyJobQueue do
+  use EctoJob.JobQueue, table_name: "jobs", params_type: :binary
+  # ...
+end
+```
+
+Possible values of the option are: `:map` (default) and `:binary` (for storing Elixir/Erlang terms).
+
+You should use the same option when setting up the migration:
+
+```elixir
+@ecto_job_version 3
+
+def up do
+  EctoJob.Migrations.Install.up()
+  EctoJob.Migrations.up("jobs", version: @ecto_job_version, params_type: :binary)
+end
+```
+
+
 # 3.0.0
 
 Version 3.0 adds support for prioritizing jobs within each job queue.

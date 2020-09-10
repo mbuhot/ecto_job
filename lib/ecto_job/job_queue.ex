@@ -527,16 +527,16 @@ defmodule EctoJob.JobQueue do
          now = %DateTime{},
          timeout_ms
        ) do
-        {count, jobs} =
-          schema
-          |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
-          |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
-          |> Query.select([job], job)
-          |> repo.update_all(
-            set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
-          )
+    {count, jobs} =
+      schema
+      |> Query.with_cte("available_jobs", as: ^available_jobs(schema, demand))
+      |> Query.join(:inner, [job], a in "available_jobs", on: job.id == a.id)
+      |> Query.select([job], job)
+      |> repo.update_all(
+        set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
+      )
 
-        {count, deserialize_job_params(jobs)}
+    {count, deserialize_job_params(jobs)}
   end
 
   defp do_reserve_available_jobs(
@@ -580,8 +580,9 @@ defmodule EctoJob.JobQueue do
       end)
 
     {count, deserialize_job_params(jobs)}
+  end
 
-    defp deserialize_job_params(jobs) when is_list(jobs) do
+  defp deserialize_job_params(jobs) when is_list(jobs) do
     for job <- jobs, do: deserialize_job_params(job)
   end
 

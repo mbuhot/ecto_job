@@ -32,6 +32,14 @@ defmodule EctoJob.JobQueueTest do
                  :updated_at
                ]
     end
+
+    test "params type is :map by default" do
+      assert EctoJob.Test.JobQueue.__schema__(:type, :params) == :map
+    end
+
+    test "params type is :binary for `params_type: :binary`" do
+      assert EctoJob.Test.ParamsBinaryJobQueue.__schema__(:type, :params) == :binary
+    end
   end
 
   describe "JobQueue.new" do
@@ -59,6 +67,11 @@ defmodule EctoJob.JobQueueTest do
     test "Accepts a priority option" do
       job = EctoJob.Test.JobQueue.new(%{}, priority: 1)
       assert job.priority == 1
+    end
+
+    test "Converts params to binary for `params_type: :binary`" do
+      job = EctoJob.Test.ParamsBinaryJobQueue.new(%{a: 1})
+      assert job.params == <<131, 116, 0, 0, 0, 1, 100, 0, 1, 97, 97, 1>>
     end
   end
 
@@ -321,6 +334,21 @@ defmodule EctoJob.JobQueueTest do
       Enum.each(low_priority_jobs, fn job ->
         assert job.priority == low_priority
       end)
+    end
+
+    test "RESERVES available jobs with `params_type: :binary`" do
+      Repo.insert!(EctoJob.Test.ParamsBinaryJobQueue.new("binary"))
+
+      {1, [job]} =
+        EctoJob.JobQueue.reserve_available_jobs(
+          Repo,
+          EctoJob.Test.ParamsBinaryJobQueue,
+          1,
+          DateTime.utc_now(),
+          5_000
+        )
+
+      assert job.params == "binary"
     end
   end
 

@@ -89,6 +89,7 @@ defmodule EctoJob.Migrations do
 
       timestamp_opts = Keyword.get(opts, :timestamps, [])
       version = Keyword.get(opts, :version, 2)
+      params_type = Keyword.get(opts, :params_type, :map)
 
       _ =
         create table(name, opts) do
@@ -100,7 +101,7 @@ defmodule EctoJob.Migrations do
 
           add(:attempt, :integer, null: false, default: 0)
           add(:max_attempts, :integer, null: false, default: 5)
-          add(:params, :map, null: false)
+          add(:params, params_type, null: false)
           add(:notify, :string)
 
           if version >= 3 do

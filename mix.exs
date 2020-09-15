@@ -9,7 +9,7 @@ defmodule EctoJob.Mixfile do
       app: :ecto_job,
       description: "A transactional job queue built with Ecto, PostgreSQL and GenStage.",
       version: @version,
-      elixir: "~> 1.7",
+      elixir: "~> 1.10",
       elixirc_paths: elixirc_paths(Mix.env()),
       elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,

@@ -171,6 +171,7 @@ defmodule EctoJob.Migrations do
     """
     def up(3, name, opts \\ []) do
       prefix = Keyword.get(opts, :prefix)
+
       alter table(name, prefix: prefix) do
         add(:priority, :integer, null: false, default: 0)
       end

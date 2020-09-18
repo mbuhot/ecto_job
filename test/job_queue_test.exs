@@ -2,6 +2,7 @@ defmodule EctoJob.JobQueueTest do
   # credo:disable-for-this-file
 
   use ExUnit.Case, async: true
+  alias EctoJob.Test
   alias EctoJob.Test.Repo
   require Ecto.Query, as: Query
 
@@ -34,11 +35,12 @@ defmodule EctoJob.JobQueueTest do
     end
 
     test "params type is :map by default" do
-      assert EctoJob.Test.JobQueue.__schema__(:type, :params) == :map
+      assert EctoJob.Test.JobQueue.__schema__(:type, :params) == EctoJob.JobQueue.JsonParams
     end
 
     test "params type is :binary for `params_type: :binary`" do
-      assert EctoJob.Test.ParamsBinaryJobQueue.__schema__(:type, :params) == :binary
+      assert EctoJob.Test.ParamsBinaryJobQueue.__schema__(:type, :params) ==
+               EctoJob.JobQueue.TermParams
     end
   end
 
@@ -68,10 +70,24 @@ defmodule EctoJob.JobQueueTest do
       job = EctoJob.Test.JobQueue.new(%{}, priority: 1)
       assert job.priority == 1
     end
+  end
 
-    test "Converts params to binary for `params_type: :binary`" do
-      job = EctoJob.Test.ParamsBinaryJobQueue.new(%{a: 1})
-      assert job.params == <<131, 116, 0, 0, 0, 1, 100, 0, 1, 97, 97, 1>>
+  describe "Storing and retrieving Job" do
+    setup do
+      _ = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
+      _ = Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
+
+      :ok
+    end
+
+    test "With `params_type: :binary` params are serialized and deserialized correctly" do
+      job = Test.ParamsBinaryJobQueue.new(%{a: 1})
+
+      ret = Repo.insert(job)
+      assert {:ok, %Test.ParamsBinaryJobQueue{params: %{a: 1}} = persisted_job} = ret
+
+      ret = Repo.get(Test.ParamsBinaryJobQueue, persisted_job.id)
+      assert %Test.ParamsBinaryJobQueue{params: %{a: 1}} = ret
     end
   end
 

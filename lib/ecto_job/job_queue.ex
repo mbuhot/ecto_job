@@ -81,7 +81,13 @@ defmodule EctoJob.JobQueue do
     table_name = Keyword.fetch!(opts, :table_name)
     schema_prefix = Keyword.get(opts, :schema_prefix)
     timestamps_opts = Keyword.get(opts, :timestamps_opts)
-    params_type = Keyword.get(opts, :params_type, :map)
+
+    params_type =
+      case Keyword.get(opts, :params_type, :map) do
+        :map -> EctoJob.JobQueue.JsonParams
+        :binary -> EctoJob.JobQueue.TermParams
+        type -> raise "Unsupported params type: #{inspect(type)}"
+      end
 
     quote bind_quoted: [
             table_name: table_name,
@@ -90,15 +96,14 @@ defmodule EctoJob.JobQueue do
             params_type: params_type
           ] do
       use Ecto.Schema
-      require EctoJob.JobQueue.Helpers
 
       @behaviour EctoJob.JobQueue
       @before_compile EctoJob.JobQueue
 
       params_spec =
         case params_type do
-          :map -> :map
-          :binary -> {:term, [], []}
+          EctoJob.JobQueue.JsonParams -> :map
+          EctoJob.JobQueue.TermParams -> {:term, [], []}
         end
 
       @type params :: unquote(params_spec)
@@ -182,13 +187,15 @@ defmodule EctoJob.JobQueue do
       """
       @spec new(params(), Keyword.t()) :: EctoJob.JobQueue.job()
       def new(params, opts \\ []) do
+        {:ok, params} = Ecto.Type.cast(@params_type, params)
+
         %__MODULE__{
           state: if(opts[:schedule], do: "SCHEDULED", else: "AVAILABLE"),
           expires: nil,
           schedule: Keyword.get(opts, :schedule, DateTime.utc_now()),
           attempt: 0,
           max_attempts: opts[:max_attempts],
-          params: EctoJob.JobQueue.Helpers.__serialize_params__(params, @params_type),
+          params: params,
           notify: opts[:notify],
           priority: Keyword.get(opts, :priority, 0)
         }
@@ -353,7 +360,7 @@ defmodule EctoJob.JobQueue do
   def update_job_in_progress(repo, job, now, timeout_ms) do
     case do_update_job_in_progress(repo.__adapter__(), repo, job, now, timeout_ms) do
       {0, _} -> {:error, :expired}
-      {1, [job]} -> {:ok, deserialize_job_params(job)}
+      {1, [job]} -> {:ok, job}
     end
   end
 
@@ -381,7 +388,7 @@ defmodule EctoJob.JobQueue do
 
       {1, [job]} ->
         notify_failed(repo, job, updates)
-        {:ok, deserialize_job_params(job)}
+        {:ok, job}
     end
   end
 
@@ -552,7 +559,7 @@ defmodule EctoJob.JobQueue do
         set: [state: "RESERVED", expires: reservation_expiry(now, timeout_ms), updated_at: now]
       )
 
-    {count, deserialize_job_params(jobs)}
+    {count, jobs}
   end
 
   defp do_reserve_available_jobs(
@@ -595,17 +602,6 @@ defmodule EctoJob.JobQueue do
         {count, jobs}
       end)
 
-    {count, deserialize_job_params(jobs)}
-  end
-
-  defp deserialize_job_params(jobs) when is_list(jobs) do
-    for job <- jobs, do: deserialize_job_params(job)
-  end
-
-  defp deserialize_job_params(job = %schema{}) do
-    case schema.__schema__(:type, :params) do
-      :map -> job
-      :binary -> %{job | params: :erlang.binary_to_term(job.params)}
-    end
+    {count, jobs}
   end
 end

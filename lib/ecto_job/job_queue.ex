@@ -102,7 +102,7 @@ defmodule EctoJob.JobQueue do
 
       params_spec =
         case params_type do
-          EctoJob.JobQueue.JsonParams -> :map
+          EctoJob.JobQueue.JsonParams -> {:map, [], []}
           EctoJob.JobQueue.TermParams -> {:term, [], []}
         end
 

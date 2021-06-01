@@ -5,7 +5,7 @@ defmodule EctoJob.Supervisor do
   The `EctoJob.Supervisor` will start the required processes to listen for postgres job notifications,
   GenStage producer and ConsumerSupervisor to process the jobs.
 
-  ## Example:
+  ## Examples
 
       def start(_type, _args) do
         import Supervisor.Spec
@@ -24,13 +24,14 @@ defmodule EctoJob.Supervisor do
         opts = [strategy: :one_for_one, name: MyApp.Supervisor]
         Supervisor.start_link(children, opts)
       end
+
   """
 
   import Supervisor.Spec, only: [worker: 2, supervisor: 2]
   alias EctoJob.{Config, Producer, WorkerSupervisor}
 
   @doc """
-  Starts an EctoJob queue supervisor
+  Starts an EctoJob queue supervisor.
   """
   @spec start_link(Config.t()) :: {:ok, pid}
   def start_link(

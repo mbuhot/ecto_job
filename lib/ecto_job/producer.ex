@@ -23,7 +23,7 @@ defmodule EctoJob.Producer do
 
   defmodule State do
     @moduledoc """
-    Internal state of the Producer GenStage
+    Internal state of the Producer GenStage.
     """
 
     @enforce_keys [
@@ -64,13 +64,14 @@ defmodule EctoJob.Producer do
   end
 
   @doc """
-  Starts the producer GenStage process.
+  Starts the producer GenStage process:
+
    - `name` : The process name to register this GenStage as
    - `repo` : The Ecto Repo module to user for querying
    - `schema` : The EctoJob.JobQueue module to query
    - `notifier` : The name of the `Postgrex.Notifications` notifier process
    - `poll_interval` : Timer interval for activating scheduled/expired jobs
-   - `notifications_listen_timeout`: Time in milliseconds that Notifications.listen!/3 is alloted to start listening to notifications from postgrex for new jobs
+   - `notifications_listen_timeout`: Time in milliseconds that Notifications.listen!/3 is allotted to start listening to notifications from postgrex for new jobs
   """
   @spec start_link(
           name: atom,
@@ -147,8 +148,8 @@ defmodule EctoJob.Producer do
   @doc """
   Messages from the timer and the notifications listener will be handled in `handle_info`.
 
-  `:poll` messages will attempt to activate jobs, and dispatch them according to current demand.
-  `:notification` messages will dispatch any active jobs according to current demand.
+    * `:poll` messages will attempt to activate jobs, and dispatch them according to current demand.
+    * `:notification` messages will dispatch any active jobs according to current demand.
   """
   @spec handle_info(term, State.t()) :: {:noreply, [JobQueue.job()], State.t()}
   def handle_info(:poll, state = %State{repo: repo, schema: schema, clock: clock}) do
@@ -170,7 +171,7 @@ defmodule EctoJob.Producer do
     dispatch_jobs(%{state | demand: demand + buffered_demand}, clock.())
   end
 
-  # Acivate sheduled jobs and expired jobs, returning the number of jobs activated
+  # Activate scheduled jobs and expired jobs, returning the number of jobs activated
   @spec activate_jobs(repo, schema, DateTime.t()) :: integer
   defp activate_jobs(repo, schema, now = %DateTime{}) do
     JobQueue.activate_scheduled_jobs(repo, schema, now) +

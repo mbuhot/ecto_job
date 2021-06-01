@@ -8,7 +8,7 @@ defmodule EctoJob.JobQueue do
   * `:schema_prefix` - (_optional_) The schema prefix for the table.
   * `:timestamps_opts` - (_optional_) Configures the timestamp fields for the schema (See `Ecto.Schema.timestamps/1`)
 
-  ## Example
+  ## Examples
 
       defmodule MyApp.JobQueue do
         use EctoJob.JobQueue, table_name: "jobs", schema_prefix: "my_app"
@@ -18,6 +18,7 @@ defmodule EctoJob.JobQueue do
           ...
         end
       end
+
   """
 
   alias Ecto.{Changeset, Multi}
@@ -30,10 +31,10 @@ defmodule EctoJob.JobQueue do
   @type schema :: module
 
   @typedoc """
-  Job State enumeration
+  Job State enumeration.
 
    - `"SCHEDULED"`: The job is scheduled to run at a future time
-   - `"AVAILABLE"`: The job is availble to be run by the next available worker
+   - `"AVAILABLE"`: The job is available to be run by the next available worker
    - `"RESERVED"`: The job has been reserved by a worker for execution
    - `"IN_PROGRESS"`: The job is currently being worked
    - `"RETRY"`: The job has failed and it's waiting for a retry
@@ -66,11 +67,12 @@ defmodule EctoJob.JobQueue do
 
   The return type is the same as `Ecto.Repo.transaction/1`.
 
-  ## Example
+  ## Examples
 
       @impl true
       def perform(multi, params = %{"type" => "new_user"}), do: NewUser.perform(multi, params)
       def perform(multi, params = %{"type" => "sync_crm"}), do: SyncCRM.perform(multi, params)
+
   """
   @callback perform(multi :: Multi.t(), params :: params()) ::
               {:ok, any()}
@@ -145,7 +147,7 @@ defmodule EctoJob.JobQueue do
       end
 
       @doc """
-      Supervisor child_spec for use with Elixir 1.5+
+      Supervisor child_spec for use with Elixir 1.5+.
 
       See `EctoJob.Config` for available configuration options.
       """
@@ -163,9 +165,10 @@ defmodule EctoJob.JobQueue do
 
       See `EctoJob.Config` for available configuration options.
 
-      ## Example
+      ## Examples
 
           MyApp.JobQueue.start_link(repo: MyApp.Repo, max_demand: 25)
+
       """
       @spec start_link(Keyword.t()) :: {:ok, pid}
       def start_link(opts) do
@@ -176,7 +179,7 @@ defmodule EctoJob.JobQueue do
       @doc """
       Create a new `#{__MODULE__}` instance with the given job params.
 
-      Params will be serialized as JSON or Elixir/Erlang term, so
+      Params will be serialized as JSON or Elixir/Erlang term.
 
       Options:
 
@@ -206,12 +209,13 @@ defmodule EctoJob.JobQueue do
 
       This is the preferred method of enqueueing jobs along side other application updates.
 
-      ## Example:
+      ## Examples
 
           Ecto.Multi.new()
           |> Ecto.Multi.insert(create_new_user_changeset(user_params))
           |> MyApp.Job.enqueue("send_welcome_email", %{"type" => "SendWelcomeEmail", "user" => user_params})
           |> MyApp.Repo.transaction()
+
       """
       @spec enqueue(Multi.t(), term, params(), Keyword.t()) :: Multi.t()
       def enqueue(multi, name, params, opts \\ []) do
@@ -221,15 +225,17 @@ defmodule EctoJob.JobQueue do
       @doc """
       Requeues failed job by adding to an `Ecto.Multi` update statement,
       which will:
-      * set `state` to `SCHEDULED`
-      * set `attempt` to `0`
-      * set `expires` to `nil`
 
-      ## Example:
+        * set `state` to `SCHEDULED`
+        * set `attempt` to `0`
+        * set `expires` to `nil`
+
+      ## Examples
 
           Ecto.Multi.new()
           |> MyApp.Job.requeue("requeue_job", failed_job)
           |> MyApp.Repo.transaction()
+
       """
       @spec requeue(Multi.t(), term, EctoJob.JobQueue.job()) ::
               Multi.t() | {:error, :non_failed_job}
@@ -308,7 +314,8 @@ defmodule EctoJob.JobQueue do
   Updates a batch of jobs in `"AVAILABLE"` state to `"RESERVED"` state with a timeout.
 
   The batch size is determined by `demand`.
-  returns `{count, updated_jobs}` tuple.
+
+  Returns `{count, updated_jobs}` tuple.
   """
   @spec reserve_available_jobs(repo, schema, integer, DateTime.t(), integer) :: {integer, [job]}
   def reserve_available_jobs(repo, schema, demand, now, timeout_ms) do
@@ -318,7 +325,7 @@ defmodule EctoJob.JobQueue do
   @doc """
   Builds a query for a batch of available jobs.
 
-  The batch size is determined by `demand`
+  The batch size is determined by `demand`.
   """
   @spec available_jobs(schema, integer) :: Ecto.Query.t()
   def available_jobs(schema, demand) do
@@ -353,7 +360,7 @@ defmodule EctoJob.JobQueue do
   timeout proportional to the attempt counter and the expiry_timeout, which defaults to
   300_000 ms (5 minutes) unless otherwise configured.
 
-  Returns `{:ok, job}` when sucessful, `{:error, :expired}` otherwise.
+  Returns `{:ok, job}` when successful, `{:error, :expired}` otherwise.
   """
   @spec update_job_in_progress(repo, job, DateTime.t(), integer) ::
           {:ok, job} | {:error, :expired}

@@ -182,7 +182,7 @@ defmodule EctoJob.Migrations do
     end
 
     @doc """
-    Roll back updates from job queue table with the given ecto job version and name.
+    Rolls back updates from job queue table with the given ecto job version and name.
     """
     def down(3, name, opts \\ []) do
       prefix = Keyword.get(opts, :prefix)

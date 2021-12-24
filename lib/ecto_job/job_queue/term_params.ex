@@ -1,6 +1,6 @@
 defmodule EctoJob.JobQueue.TermParams do
   @moduledoc """
-  Job queue parameters as Json
+  Job queue parameters as JSON.
   """
   use Ecto.Type
 

@@ -10,29 +10,30 @@ defmodule EctoJob.Migrations do
 
   defmodule Install do
     @moduledoc """
-    Defines migrations for installing shared functions
+    Defines migrations for installing shared functions.
     """
 
     import Ecto.Migration
 
     @doc """
     Creates the `fn_notify_inserted` trigger function.
+
     This function will be called from triggers attached to job queue tables.
 
     ## Options
 
-    * `:prefix` - the prefix (aka Postgresql schema) to create the functions in.
+    * `:prefix` - the prefix (aka PostgreSQL schema) to create the functions in.
     """
     def up(opts \\ []) do
       specific_up(repo().__adapter__(), opts)
     end
 
     @doc """
-    Drops the `fn_notify_inserted` trigger function
+    Drops the `fn_notify_inserted` trigger function.
 
     ## Options
 
-    * `:prefix` - the prefix (aka Postgresql schema) containing the function to remove.
+    * `:prefix` - the prefix (aka PostgreSQL schema) containing the function to remove.
     """
     def down(opts \\ []) do
       specific_down(repo().__adapter__(), opts)
@@ -160,14 +161,15 @@ defmodule EctoJob.Migrations do
 
   defmodule UpdateJobTable do
     @moduledoc """
-    Defines an update migration to an especific version of Ecto Job.
+    Defines an update migration to a specific version of Ecto Job.
+
     This migration can be run multiple times with different values to update multiple queues.
     """
 
     import Ecto.Migration
 
     @doc """
-    Upgrade the job queue table with the given ecto job version and name.
+    Upgrades the job queue table with the given ecto job version and name.
     """
     def up(3, name, opts \\ []) do
       prefix = Keyword.get(opts, :prefix)
@@ -180,7 +182,7 @@ defmodule EctoJob.Migrations do
     end
 
     @doc """
-    Rollback updates from job queue table with the given ecto job version and name.
+    Rolls back updates from job queue table with the given ecto job version and name.
     """
     def down(3, name, opts \\ []) do
       prefix = Keyword.get(opts, :prefix)

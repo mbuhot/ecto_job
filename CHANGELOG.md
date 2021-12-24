@@ -1,4 +1,6 @@
-# 3.1.0
+# Changelog
+
+## v3.1.0 - 2020-09-16
 
 Version 3.1.0 adds support for job params as an Elixir/Erlang term.
 You can insert any arbitrary Elixir/Erlang term into the queue:
@@ -32,7 +34,7 @@ end
 ```
 
 
-# 3.0.0
+## v3.0.0 - 2019-10-24
 
 Version 3.0 adds support for prioritizing jobs within each job queue.
 The `priority` option can be given when creating a Job:
@@ -74,7 +76,7 @@ end
 ```
 
 
-# 2.1.0
+## v2.1.0 - 2019-05-16
 
 Version 2.1 add support for requeing jobs, fixes to the job reservation algorithm and dialyzer warnings.
 
@@ -101,10 +103,10 @@ Ecto.Multi.new()
 
 [#48](https://github.com/mbuhot/ecto_job/pull/48) - [darksheik](https://github.com/darksheik) - Improved documentation
 
-Thankyou contributors!
+Thank you contributors!
 
 
-# 2.0.0
+## v2.0.0 - 2019-01-18
 
 EctoJob 2.0 adds support for Ecto 3.0.
 
@@ -117,7 +119,7 @@ There should be no breaking changes other than the dependency on `ecto_sql ~> 3.
 [#29](https://github.com/mbuhot/ecto_job/pull/29) - [mbuhot](https://github.com/mbuhot) - EctoJob will always use a `:bigserial` primary key instead of relying on the `ecto` default.
 
 
-# 1.0.0
+## v1.0.0 - 2018-10-04
 
 [#24](https://github.com/mbuhot/ecto_job/pull/24) - [mbuhot](https://github.com/mbuhot) - EctoJob will work in a polling fashion when `Postgrex.Notifications` is not working reliably.
 See https://github.com/elixir-ecto/postgrex/issues/375 for some background.
@@ -126,13 +128,13 @@ See https://github.com/elixir-ecto/postgrex/issues/375 for some background.
 
 [#22](https://github.com/mbuhot/ecto_job/pull/22) - [niku](https://github.com/niku) - Fix code samples in README
 
-# 0.3.0
+## v0.3.0 - 2018-06-02
 
 [#17](https://github.com/mbuhot/ecto_job/pull/17) - [mmartinson](https://github.com/mmartinson) - Make base expiry configurable
 
 Adds configuration options for `execution_timeout` and `reservation_timeout`.
 
-# 0.2.1
+## v0.2.1 - 2018-03-29
 
 [#14](https://github.com/mbuhot/ecto_job/pull/14) - [mbuhot](https://github.com/mbuhot) - Improve configuration flexibility
 
@@ -140,16 +142,16 @@ Configuration can be supplied through the supervisor opts, application config, o
 
 [#15](https://github.com/mbuhot/ecto_job/pull/15) - [mbuhot](https://github.com/mbuhot) - Fix dialyzer warnings and improve docs.
 
-# 0.2.0
+## v0.2.0 - 2018-03-28
 
 [#9](https://github.com/mbuhot/ecto_job/pull/9) - [darksheik](https://github.com/darksheik) - Configurable job polling interval
 
 [#11](https://github.com/mbuhot/ecto_job/pull/11) - [darksheik](https://github.com/darksheik) - Configurable logging level
 
-# 0.1.1
+## v0.1.1 - 2018-02-16
 
 [#5](https://github.com/mbuhot/ecto_job/pull/5) - [darksheik](https://github.com/darksheik) - Ensure triggers dropped on job table down migration.
 
-# 0.1
+## v0.1.0 - 2018-01-20
 
 Initial Release to Hex.pm

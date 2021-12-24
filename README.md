@@ -1,15 +1,18 @@
-[![Build Status](https://travis-ci.org/mbuhot/ecto_job.svg?branch=master)](https://travis-ci.org/mbuhot/ecto_job)
-[![Hex.pm](https://img.shields.io/hexpm/v/ecto_job.svg)](https://hex.pm/packages/ecto_job)
-[![HexDocs](https://img.shields.io/badge/api-docs-yellow.svg)](https://hexdocs.pm/ecto_job/)
-[![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg?branch=master&style=flat)](http://inch-ci.org/github/mbuhot/ecto_job)
-[![License](https://img.shields.io/hexpm/l/ecto_job.svg)](https://github.com/mbuhot/ecto_job/blob/master/LICENSE)
-
 # EctoJob
+
+[![Build Status](https://travis-ci.org/mbuhot/ecto_job.svg?branch=master)](https://travis-ci.org/mbuhot/ecto_job)
+[![Module Version](https://img.shields.io/hexpm/v/ecto_job.svg)](https://hex.pm/packages/ecto_job)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/ecto_job/)
+[![Inline docs](http://inch-ci.org/github/mbuhot/ecto_job.svg?branch=master&style=flat)](http://inch-ci.org/github/mbuhot/ecto_job)
+[![Total Download](https://img.shields.io/hexpm/dt/ecto_job.svg)](https://hex.pm/packages/ecto_job)
+[![License](https://img.shields.io/hexpm/l/ecto_job.svg)](https://github.com/mbuhot/ecto_job/blob/master/LICENSE.md)
+[![Last Updated](https://img.shields.io/github/last-commit/mbuhot/ecto_job.svg)](https://github.com/mbuhot/ecto_job/commits/master)
+
 
 A transactional job queue built with Ecto and GenStage.
 
-It is compatible with Postgresql and Mysql with a major difference:
-* Postgresql: job queue updates are notified to ecto_job through Postgresql
+It is compatible with PostgreSQL and MySQL with a major difference:
+* PostgreSQL: job queue updates are notified to ecto_job through PostgreSQL
   notification feature.
 * MySQL: job queue updates are notified through database polling.
 
@@ -34,7 +37,7 @@ Add `:ecto_job` to your `dependencies`
 
 ## Installation
 
-Add a migration to install the notification function and create the a job queue table:
+Add a migration to install the notification function and create a job queue table:
 
 ```
 mix ecto.gen.migration create_job_queue
@@ -62,11 +65,11 @@ By default, a job holds a map of arbitrary data (which corresponds to a `jsonb` 
 If you want to store an arbitrary Elixir/Erlang term in the job (`bytea` in the table),
 you can set up the `params_type` option:
 
-```
-  def up do
-    EctoJob.Migrations.Install.up()
-    EctoJob.Migrations.CreateJobTable.up("jobs", version: @ecto_job_version, params_type: :binary)
-  end
+```elixir
+def up do
+  EctoJob.Migrations.Install.up()
+  EctoJob.Migrations.CreateJobTable.up("jobs", version: @ecto_job_version, params_type: :binary)
+end
 ```
 
 ### Compatibility
@@ -84,7 +87,7 @@ the following specific syntax:
 
 To upgrade your project to 3.0 version of `ecto_job` you must add a migration to update the pre-existent job queue tables:
 
-```
+```bash
 mix ecto.gen.migration update_job_queue
 ```
 
@@ -101,8 +104,6 @@ defmodule MyApp.Repo.Migrations.UpdateJobQueue do
   end
 end
 ```
-
-
 
 Add a module for the queue, mix in `EctoJob.JobQueue`.
 This will declare an `Ecto.Schema` to use with the table created in the migration, and a `start_link` function allowing the worker supervision tree to be started conveniently.
@@ -241,36 +242,36 @@ defmodule MyApp.JobQueue do
   ...
 end
 ```
+
 ### Options
 
 You can customize how often the table is polled for scheduled jobs.  The default is `60_000` ms.
 
-```
+```elixir
 config :ecto_job, :poll_interval, 15_000
 ```
 
 Control the time for which the job is reserved while waiting for a worker to pick it up, before the poller will make the job available again for dispatch by the producer.  The default is `60_000` ms.
 
-```
+```elixir
 config :ecto_job, :reservation_timeout, 15_000
 ```
 
 Control the delay between retries following a job execution failure. Keep in mind, for jobs that are expected to retry quickly, any configured `retry_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `30_000` ms (30 seconds).
 
-```
+```elixir
 config :ecto_job, :retry_timeout, 30_000
 ```
 
 Control the timeout for job execution before an "IN_PROGRESS" job is assumed to have failed. Begins when job is picked up by worker. Similarly to `retry_timeout`, any configured `execution_timeout` will only retry a job as quickly as the `poll_interval`.  The default is `300_000` ms (5 mins).
 
-```
+```elixir
 config :ecto_job, :execution_timeout, 300_000
 ```
 
-
 You can control whether logs are on or off and the log level.  The default is `true` and `:info`.
 
-```
+```elixir
 config :ecto_job, log: true,
                   log_level: :debug
 ```
@@ -327,3 +328,10 @@ When performing long-running jobs or when configuring a short execution timeout,
 In the case that the initial job attempts to finish and commit a result, and the commit includes the preloaded multi passed as the first parameter to `perform/2`, the optimistic lock will fail the transaction.
 
 In the case where the job performs other side effects outside of the transaction such as calls to external APIs or additional database writes, these are suggested to implement other idempotency guarantees, as they will not be rolled back in a failed or duplicated job.
+
+## Copyright and License
+
+Copyright (c) 2017 Mike Buhot
+
+This library is released under the MIT License. See the [LICENSE.md](./LICENSE.md) file
+for further details.

@@ -1,6 +1,6 @@
 defmodule EctoJob.Worker do
   @moduledoc """
-  Worker module responsible for executing a single Job
+  Worker module responsible for executing a single Job.
   """
   alias EctoJob.{Config, JobQueue}
   require Logger
@@ -8,13 +8,14 @@ defmodule EctoJob.Worker do
   @type repo :: module
 
   @doc """
-  Equivalent to `start_link(config, job, DateTime.utc_now())`
+  Equivalent to `start_link(config, job, DateTime.utc_now())`.
   """
   @spec start_link(Config.t(), EctoJob.JobQueue.job()) :: {:ok, pid}
   def start_link(config, job), do: start_link(config, job, DateTime.utc_now())
 
   @doc """
-  Start a worker process given a repo module and a job struct
+  Start a worker process given a repo module and a job struct.
+
   This may fail if the job reservation has expired, in which case the job will be
   reactivated by the producer.
   """

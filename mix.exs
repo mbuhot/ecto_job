@@ -7,7 +7,6 @@ defmodule EctoJob.Mixfile do
   def project do
     [
       app: :ecto_job,
-      description: "A transactional job queue built with Ecto, PostgreSQL and GenStage.",
       version: @version,
       elixir: "~> 1.10",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -33,9 +32,11 @@ defmodule EctoJob.Mixfile do
 
   defp package do
     [
+      description: "A transactional job queue built with Ecto, PostgreSQL and GenStage.",
       licenses: ["MIT"],
       maintainers: ["Mike Buhot (m.buhot@gmail.com)"],
       links: %{
+        "Changelog" => "https://hexdocs.pm/ecto_job/changelog.html",
         "Github" => @url
       }
     ]
@@ -52,11 +53,16 @@ defmodule EctoJob.Mixfile do
 
   defp docs do
     [
-      extras: ["README.md"],
+      extras: [
+        "CHANGELOG.md",
+        "LICENSE.md": [title: "License"],
+        "README.md": [title: "Overview"]
+      ],
       main: "readme",
       source_ref: "v#{@version}",
       source_url: @url,
-      homepage_url: @url
+      homepage_url: @url,
+      formatters: ["html"]
     ]
   end
 

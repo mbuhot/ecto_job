@@ -46,7 +46,7 @@ defmodule EctoJob.Config do
   @doc """
   Constructs a new `Config` from params, falling back to Application environment then to default values.
 
-  ## Example
+  ## Examples
 
       iex> EctoJob.Config.new(repo: MyApp.Repo, log: false)
       %EctoJob.Config{
@@ -60,6 +60,7 @@ defmodule EctoJob.Config do
         execution_timeout: 300_000,
         notifications_listen_timeout: 5_000
       }
+
   """
   @spec new(Keyword.t()) :: Config.t()
   def new(params \\ []) when is_list(params) do
